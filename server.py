@@ -1608,10 +1608,12 @@ def init_storage():
 if __name__ == '__main__':
     init_storage()
     threading.Thread(target=session_cleanup_loop, name='session-cleanup', daemon=True).start()
-    server = ThreadingHTTPServer(('127.0.0.1', 8765), Handler)
+    host = '0.0.0.0' if os.environ.get('RENDER') else '127.0.0.1'
+    port = int(os.environ.get('PORT', '8765'))
+    server = ThreadingHTTPServer((host, port), Handler)
     print('========================================================')
     print('  BrandWise — Brand Governance Platform Backend')
-    print('  Running at: http://127.0.0.1:8765')
+    print(f'  Running at: http://{host}:{port}')
     print('========================================================')
     try:
         server.serve_forever()
