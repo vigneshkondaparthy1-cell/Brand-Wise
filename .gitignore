@@ -1,0 +1,10 @@
+# Local secrets and user data
+.env
+accounts.sqlite3
+audit-data.json
+insights-data.json
+
+# Generated Python files
+__pycache__/
+*.py[cod]
+evaluation/__pycache__/

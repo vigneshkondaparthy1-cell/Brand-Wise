@@ -1,0 +1,113 @@
+{
+  "version": "3.2",
+  "updatedAt": "2026-11-01T00:00:00Z",
+  "brandName": "Acme Technologies",
+  "productName": "BrandWise",
+  "requiredDisclaimer": "Terms and conditions apply. Performance metrics reflect verified customer benchmarks and may vary based on deployment configuration.",
+  "tone": {
+    "primary": "Professional, grounded, confident and explainable",
+    "avoid": "Over-promising, hyperbolic buzzwords, ungrounded superlatives",
+    "rules": [
+      "Use active voice and clear, factual declarations.",
+      "Respect regional English variants: Indian English conventions (e.g., 'revert back', 'prepone', 'kindly note') are reviewed contextually without penalizing formal fluency.",
+      "State measurable benefits instead of vague superlatives (e.g., 'cuts onboarding time by up to 20%' instead of 'fastest in the galaxy').",
+      "Always include the mandatory legal disclaimer on outward customer-facing marketing material."
+    ]
+  },
+  "terminology": {
+    "approved": [
+      {
+        "term": "BrandWise",
+        "note": "Always camel-case as BrandWise; never Brandwise or BRANDWISE in body copy."
+      },
+      {
+        "term": "Client Workspace",
+        "note": "Approved noun for tenant spaces."
+      },
+      {
+        "term": "Claim Ledger",
+        "note": "Capitalized when referring to the official repository."
+      },
+      {
+        "term": "Source-backed",
+        "note": "Hyphenated descriptor."
+      },
+      {
+        "term": "Pre-publication review",
+        "note": "Official platform definition."
+      }
+    ],
+    "prohibited": [
+      {
+        "term": "Brandwise",
+        "reason": "Incorrect brand casing. Must be 'BrandWise'.",
+        "suggested": "BrandWise",
+        "severity": "Medium"
+      },
+      {
+        "term": "world's leading",
+        "reason": "Unsupported market superlative. Risk of false advertising.",
+        "suggested": "leading provider",
+        "severity": "High"
+      },
+      {
+        "term": "world's best",
+        "reason": "Unsubstantiated superlative.",
+        "suggested": "industry-standard",
+        "severity": "High"
+      },
+      {
+        "term": "#1 platform",
+        "reason": "Unsubstantiated market ranking claim.",
+        "suggested": "dedicated platform",
+        "severity": "High"
+      },
+      {
+        "term": "100% guaranteed",
+        "reason": "Absolute legal liability guarantee. Strictly prohibited.",
+        "suggested": "committed to SLA",
+        "severity": "Critical"
+      },
+      {
+        "term": "guaranteed results",
+        "reason": "Legal liability risk without signed SLA.",
+        "suggested": "proven outcomes",
+        "severity": "Critical"
+      },
+      {
+        "term": "cheap",
+        "reason": "Diminishes brand perceived value.",
+        "suggested": "cost-effective",
+        "severity": "Low"
+      },
+      {
+        "term": "foolproof",
+        "reason": "Exaggerated claim.",
+        "suggested": "robust",
+        "severity": "Low"
+      }
+    ]
+  },
+  "visual": {
+    "primaryColor": "#0879d1",
+    "secondaryColor": "#138a69",
+    "warningColor": "#e97821",
+    "criticalColor": "#d9514d",
+    "minContrastRatio": 4.5,
+    "largeTextContrastRatio": 3.0,
+    "fontFamily": "Inter, system-ui, sans-serif",
+    "logoVariants": [
+      "brandwise-lockup-dark.svg",
+      "brandwise-lockup-light.svg",
+      "brandwise-symbol.svg"
+    ]
+  },
+  "accessibility": {
+    "standard": "WCAG 2.1 Level AA",
+    "contrastNormalText": 4.5,
+    "contrastLargeText": 3.0,
+    "requireAltText": true,
+    "maxFleschKincaidGrade": 12.0,
+    "headingHierarchyStrict": true
+  }
+}
