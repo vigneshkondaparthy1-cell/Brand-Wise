@@ -11,6 +11,7 @@ import urllib.parse
 import urllib.request
 import urllib.error
 import html as html_lib
+import uuid
 import database
 from document_ingestion import extract_document
 from gemini_review import review as gemini_review
@@ -29,6 +30,7 @@ OTP_REQUESTS_LOCK = threading.Lock()
 OTP_REQUEST_WINDOW_SECONDS = 600
 OTP_REQUEST_MAXIMUM = 5
 AUDIT_PREFERENCES_LOCK = threading.Lock()
+JSON_STORAGE_LOCK = threading.RLock()
 DEFAULT_AUDIT_PREFERENCES = {'strictness': 'balanced', 'passingThreshold': 80}
 
 def allow_otp_request(client_ip):
@@ -543,7 +545,12 @@ def save_json(path, data):
     if database.uses_postgres():
         return database.save_json(path.name, data)
     try:
-        path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding='utf-8')
+        path.parent.mkdir(parents=True, exist_ok=True)
+        payload = json.dumps(data, ensure_ascii=False, indent=2)
+        with JSON_STORAGE_LOCK:
+            temporary = path.with_name(f'.{path.name}.{uuid.uuid4().hex}.tmp')
+            temporary.write_text(payload, encoding='utf-8')
+            os.replace(temporary, path)
         return True
     except Exception:
         return False
@@ -558,9 +565,69 @@ def get_audits():
     return audits
 
 
-def get_workspace_audit_preferences():
+def audits_visible_to_user(audits, user):
+    """Enforce workspace membership; agency drafts stay private to their submitter."""
+    username = (user.get('username') or '').casefold()
+    company_id = user.get('activeCompanyId')
+    member = bool(company_id and user.get('companyRole'))
+    if user.get('role') == 'External Agency':
+        return [a for a in audits if (a.get('creatorUsername') or '').casefold() == username]
+    if member:
+        return [a for a in audits if a.get('companyId') == company_id or
+                (not a.get('companyId') and (a.get('creatorUsername') or '').casefold() == username)]
+    return [a for a in audits if (a.get('creatorUsername') or '').casefold() == username]
+
+
+def company_data_path(company_id, filename):
+    safe_id = re.sub(r'[^A-Za-z0-9_-]', '_', str(company_id))[:100]
+    folder = ROOT / 'workspace-data' / safe_id
+    folder.mkdir(parents=True, exist_ok=True)
+    return folder / filename
+
+
+def claims_for_user(user):
+    company_id = user.get('activeCompanyId')
+    return load_json(company_data_path(company_id, 'claims-data.json'), load_json(CLAIMS_DB, DEFAULT_CLAIMS)) if company_id else get_claims()
+
+
+def guidelines_for_user(user):
+    company_id = user.get('activeCompanyId')
+    return load_json(company_data_path(company_id, 'guidelines-data.json'), load_json(GUIDELINES_DB, DEFAULT_GUIDELINES)) if company_id else get_guidelines()
+
+
+def save_company_json(user, filename, fallback_path, value):
+    company_id = user.get('activeCompanyId')
+    path = company_data_path(company_id, filename) if company_id else fallback_path
+    return save_json(path, value)
+
+
+def recheck_saved_audit(audit):
+    prior = audit.get('findings', [])
+    strictness = (audit.get('settings') or {}).get('strictness', 'balanced')
+    checked = run_brandwise_checks(
+        audit.get('content', ''), channel=audit.get('channel', 'Website Copy'),
+        strictness=strictness, _claims=audit.get('claimsSnapshot', get_claims()),
+        _guidelines=audit.get('guidelinesSnapshot', get_guidelines())
+    )
+    prior_state = {(f.get('wrong'), f.get('sourceId')): f for f in prior}
+    for finding in checked['findings']:
+        old = prior_state.get((finding.get('wrong'), finding.get('sourceId')))
+        if old and old.get('actionStatus') in ('dismissed', 'reported-incorrect'):
+            finding['actionStatus'] = old['actionStatus']
+            if old.get('dismissalReason'):
+                finding['dismissalReason'] = old['dismissalReason']
+    audit['findings'] = checked['findings']
+    audit['accessibility'] = checked['accessibility']
+    audit['score'] = compliance_score(audit['findings'], strictness)
+    threshold = int(audit.get('passingThreshold', 80))
+    audit['passedThreshold'] = audit['score'] >= threshold
+    audit['status'] = 'Review required' if not audit['passedThreshold'] else 'Ready for review'
+
+
+def get_workspace_audit_preferences(company_id=None):
     with AUDIT_PREFERENCES_LOCK:
-        saved = load_json(AUDIT_PREFERENCES_DB, DEFAULT_AUDIT_PREFERENCES)
+        path = company_data_path(company_id, 'audit-preferences.json') if company_id else AUDIT_PREFERENCES_DB
+        saved = load_json(path, load_json(AUDIT_PREFERENCES_DB, DEFAULT_AUDIT_PREFERENCES) if company_id else DEFAULT_AUDIT_PREFERENCES)
     if not isinstance(saved, dict):
         saved = {}
     strictness = saved.get('strictness')
@@ -573,7 +640,7 @@ def get_workspace_audit_preferences():
     return {'strictness': strictness, 'passingThreshold': max(50, min(95, threshold))}
 
 
-def set_workspace_audit_preferences(data):
+def set_workspace_audit_preferences(data, company_id=None):
     strictness = data.get('strictness', 'balanced')
     if strictness not in ('lenient', 'balanced', 'strict'):
         raise ValueError('Choose Lenient, Balanced, or Strict review mode.')
@@ -585,7 +652,8 @@ def set_workspace_audit_preferences(data):
         raise ValueError('The passing threshold must be between 50% and 95%.')
     settings = {'strictness': strictness, 'passingThreshold': threshold}
     with AUDIT_PREFERENCES_LOCK:
-        if not save_json(AUDIT_PREFERENCES_DB, settings):
+        path = company_data_path(company_id, 'audit-preferences.json') if company_id else AUDIT_PREFERENCES_DB
+        if not save_json(path, settings):
             raise ValueError('Could not save the shared workspace audit preferences.')
     return settings
 
@@ -603,14 +671,6 @@ def compliance_score(findings, strictness='balanced'):
     if unresolved and score >= 100:
         score = 95
     return score
-
-
-def audits_visible_to_user(audits, user):
-    """External agencies can only access work belonging to their own organization."""
-    if user.get('role') != 'External Agency':
-        return audits
-    organization = (user.get('organization') or '').strip().casefold()
-    return [audit for audit in audits if (audit.get('agency') or '').strip().casefold() == organization]
 
 
 def get_claims():
@@ -1075,10 +1135,10 @@ class Handler(BaseHTTPRequestHandler):
                         'statement': claim.get('statement', ''),
                         'prohibitedPhrases': claim.get('prohibitedPhrases', []),
                     }
-                    for claim in get_claims()
+                    for claim in claims_for_user(user)
                     if claim.get('status') == 'Active' and (not claim.get('expiry') or claim.get('expiry', '') >= today)
                 ]
-                guidelines = get_guidelines()
+                guidelines = guidelines_for_user(user)
                 terminology = guidelines.get('terminology', {})
                 compact_guidelines = {
                     'tone': {
@@ -1093,15 +1153,34 @@ class Handler(BaseHTTPRequestHandler):
                 }
                 providers = {'browser': True, 'gemini': bool(os.environ.get('GEMINI_API_KEY', '').strip())}
                 return self.send_json(200, {'claims': compact_claims, 'guidelines': compact_guidelines, 'providers': providers})
+            if path == '/api/workspaces':
+                return self.send_json(200, {'workspaces': accounts.list_workspaces(self.headers), 'activeCompanyId': user.get('activeCompanyId')})
+            if path in ('/api/company-data/brand-assets', '/api/company-data/calendar-events'):
+                company_id = user.get('activeCompanyId')
+                if not company_id or not user.get('companyRole'):
+                    return self.send_json(403, {'error': 'Choose or create a company workspace first.'})
+                filename = 'brand-assets.json' if path.endswith('brand-assets') else 'calendar-events.json'
+                rows = load_json(company_data_path(company_id, filename), [])
+                return self.send_json(200, {'items': rows if isinstance(rows, list) else []})
+            if path == '/api/alerts':
+                visible = audits_visible_to_user(get_audits(), user)
+                alerts = []
+                for audit in visible:
+                    if audit.get('sampleData'):
+                        continue
+                    if audit.get('status') in ('Ready for review', 'Changes requested', 'Review required'):
+                        alerts.append({'id': audit.get('id'), 'title': audit.get('title') or 'Untitled audit', 'status': audit.get('status'), 'updatedAt': audit.get('updatedAt') or audit.get('date') or ''})
+                return self.send_json(200, {'alerts': alerts, 'count': len(alerts)})
             if path == '/api/admin/team':
-                if user['role'] != 'Admin':
-                    return self.send_json(403, {'error': 'Administrator access required.'})
-                return self.send_json(200, {'users': accounts.list_users()})
+                try:
+                    return self.send_json(200, {'users': accounts.list_workspace_users(self.headers)})
+                except PermissionError as exc:
+                    return self.send_json(403, {'error': str(exc)})
             if path == '/api/keys' and user['role'] != 'Admin':
                 return self.send_json(403, {'error': 'Administrator access required.'})
 
         if path == '/api/audit-preferences':
-            return self.send_json(200, get_workspace_audit_preferences())
+            return self.send_json(200, get_workspace_audit_preferences(user.get('activeCompanyId')))
 
         if path == '/api/health':
             storage = database.ping()
@@ -1115,7 +1194,7 @@ class Handler(BaseHTTPRequestHandler):
                 'engines': {
                     'rules': 'Deterministic WCAG 2.1 & Terminology Engine',
                     'claims': 'Claims Ledger & Expiry Verification Engine',
-                    'llm': 'Optional external text review via Gemini; no image or OCR review',
+                    'llm': 'Optional in-browser Llama 3.2 review; optional Gemini only when configured; no image or OCR review',
                     'uncertaintyMode': 'Active ("Cannot verify - needs human check" enabled)'
                 }
             })
@@ -1134,6 +1213,13 @@ class Handler(BaseHTTPRequestHandler):
             if 'q' in query:
                 q = query['q'][0].casefold()
                 audits = [a for a in audits if q in a.get('title', '').casefold() or q in a.get('content', '').casefold() or q in a.get('id', '').casefold()]
+            if 'reviewer' in query:
+                reviewer = query['reviewer'][0].casefold()
+                audits = [a for a in audits if reviewer in str(a.get('creator', '')).casefold() or reviewer in str(a.get('creatorUsername', '')).casefold() or any(reviewer in str(entry.get('user', '')).casefold() for entry in a.get('auditTrail', []) if isinstance(entry, dict))]
+            if 'from' in query:
+                audits = [a for a in audits if str(a.get('date', a.get('updatedAt', '')))[:10] >= query['from'][0]]
+            if 'to' in query:
+                audits = [a for a in audits if str(a.get('date', a.get('updatedAt', '')))[:10] <= query['to'][0]]
             return self.send_json(200, {'records': audits, 'total': len(audits)})
 
         if path.startswith('/api/audits/'):
@@ -1145,11 +1231,11 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json(404, {'error': f'Audit {audit_id} not found'})
 
         if path == '/api/claims':
-            claims = get_claims()
+            claims = claims_for_user(user)
             return self.send_json(200, {'claims': claims, 'total': len(claims)})
 
         if path == '/api/guidelines':
-            guidelines = get_guidelines()
+            guidelines = guidelines_for_user(user)
             return self.send_json(200, guidelines)
 
         if path == '/api/keys':
@@ -1287,15 +1373,68 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError as exc:
                 return self.send_json(400, {'error': str(exc)})
             return self.send_json(201, {'ok': True})
+        if path == '/api/auth/firebase/register':
+            try:
+                token = accounts.firebase_register(data)
+            except ValueError as exc:
+                return self.send_json(400, {'error': str(exc)})
+            secure = '; Secure' if self.headers.get('X-Forwarded-Proto', '').casefold() == 'https' else ''
+            return self.send_json(201, {'ok': True}, f'brandwise_session={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={accounts.SESSION_AGE}{secure}')
+        if path == '/api/auth/firebase/session':
+            client_ip = self.client_address[0]
+            if not accounts.is_local_dev() and accounts.login_is_limited(client_ip):
+                return self.send_json(429, {'error': 'Too many sign-in attempts. Try again later.'})
+            try:
+                token = accounts.firebase_session(data.get('idToken'))
+            except ValueError as exc:
+                if not accounts.is_local_dev():
+                    accounts.record_login_failure(client_ip)
+                return self.send_json(401, {'error': str(exc)})
+            accounts.clear_login_failures(client_ip)
+            secure = '; Secure' if self.headers.get('X-Forwarded-Proto', '').casefold() == 'https' else ''
+            return self.send_json(200, {'ok': True}, f'brandwise_session={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={accounts.SESSION_AGE}{secure}')
+        if path == '/api/auth/resolve-login':
+            email = accounts.email_for_login(data.get('username'))
+            return self.send_json(200, {'email': email})
         if path == '/api/auth/login':
+            client_ip = self.client_address[0]
+            if not accounts.is_local_dev() and accounts.login_is_limited(client_ip):
+                return self.send_json(429, {'error': 'Too many sign-in attempts. Try again later.'})
             token = accounts.login(data)
             if not token:
+                if not accounts.is_local_dev():
+                    accounts.record_login_failure(client_ip)
                 return self.send_json(401, {'error': 'Username, email, or password is incorrect. You can try again immediately.'})
+            accounts.clear_login_failures(client_ip)
             secure = '; Secure' if self.headers.get('X-Forwarded-Proto', '').casefold() == 'https' else ''
             return self.send_json(200, {'ok': True}, f'brandwise_session={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={accounts.SESSION_AGE}{secure}')
         user = accounts.current_user(self.headers)
         if not user:
             return self.send_json(401, {'error': 'Sign in first.'})
+        if path == '/api/workspaces':
+            try:
+                workspace = accounts.create_workspace(self.headers, data.get('name'))
+                return self.send_json(201, {'workspace': workspace, 'activeCompanyId': workspace['id']})
+            except ValueError as exc:
+                return self.send_json(400, {'error': str(exc)})
+        if path == '/api/workspaces/switch':
+            try:
+                switched = accounts.switch_workspace(self.headers, data.get('companyId'))
+                return self.send_json(200, switched)
+            except ValueError as exc:
+                return self.send_json(403, {'error': str(exc)})
+        if path == '/api/workspaces/invite':
+            try:
+                return self.send_json(201, accounts.create_workspace_invitation(self.headers, data.get('email'), data.get('role')))
+            except PermissionError as exc:
+                return self.send_json(403, {'error': str(exc)})
+            except ValueError as exc:
+                return self.send_json(400, {'error': str(exc)})
+        if path == '/api/workspaces/join':
+            try:
+                return self.send_json(200, accounts.join_workspace_invitation(self.headers, data.get('code')))
+            except ValueError as exc:
+                return self.send_json(400, {'error': str(exc)})
         if path == '/api/auth/profile':
             try:
                 return self.send_json(200, accounts.update_profile(self.headers, data))
@@ -1314,10 +1453,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(400, {'error': str(exc)})
             return self.send_json(200, {'ok': True}, 'brandwise_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0')
         if path == '/api/audit-preferences':
-            if user['role'] not in ('Brand Manager', 'Admin'):
-                return self.send_json(403, {'error': 'Brand Manager or Administrator access required.'})
+            membership = accounts.active_membership(self.headers)
+            if not membership:
+                return self.send_json(403, {'error': 'Join a company workspace before changing shared audit preferences.'})
             try:
-                return self.send_json(200, set_workspace_audit_preferences(data))
+                return self.send_json(200, set_workspace_audit_preferences(data, user.get('activeCompanyId')))
             except ValueError as exc:
                 return self.send_json(400, {'error': str(exc)})
         if path == '/api/auth/logout':
@@ -1325,10 +1465,12 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json(200, {'ok': True}, 'brandwise_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0')
         if path in ('/api/keys', '/api/keys/test', '/api/reset') and user['role'] != 'Admin':
             return self.send_json(403, {'error': 'Administrator access required.'})
-        if path in ('/api/claims', '/api/guidelines') and user['role'] not in ('Brand Manager', 'Admin'):
+        membership = accounts.active_membership(self.headers)
+        if path in ('/api/claims', '/api/guidelines') and (not membership or membership['role'] not in ('Brand Manager', 'Admin')):
             return self.send_json(403, {'error': 'Brand Manager or Admin access required.'})
         if path == '/api/import':
             try:
+                accounts.ensure_private_workspace(self.headers)
                 return self.send_json(200, extract_document(data))
             except Exception as exc:
                 return self.send_json(400, {'error': str(exc)})
@@ -1336,7 +1478,24 @@ class Handler(BaseHTTPRequestHandler):
             content = data.get('content')
             if not isinstance(content, str) or not content.strip():
                 return self.send_json(400, {'error': 'Enter copy before running accessibility checks.'})
-            return self.send_json(200, check_text_accessibility(content, get_guidelines()))
+            return self.send_json(200, check_text_accessibility(content, guidelines_for_user(user)))
+
+        if path in ('/api/company-data/brand-assets', '/api/company-data/calendar-events'):
+            membership = accounts.active_membership(self.headers)
+            if not membership:
+                return self.send_json(403, {'error': 'Choose or create a company workspace first.'})
+            items = data.get('items')
+            if not isinstance(items, list) or len(items) > 500:
+                return self.send_json(400, {'error': 'Expected a list of at most 500 workspace items.'})
+            try:
+                if len(json.dumps(items, ensure_ascii=False).encode('utf-8')) > 8 * 1024 * 1024:
+                    return self.send_json(413, {'error': 'Workspace files exceed the 8 MB shared storage limit. Remove large assets and retry.'})
+            except (TypeError, ValueError):
+                return self.send_json(400, {'error': 'Workspace items must contain JSON-compatible data.'})
+            filename = 'brand-assets.json' if path.endswith('brand-assets') else 'calendar-events.json'
+            if not save_json(company_data_path(membership['companyId'], filename), items):
+                return self.send_json(503, {'error': 'Could not save shared workspace data. Please retry.'})
+            return self.send_json(200, {'items': items})
 
         # 1. Create a new audit / Run Automated Check
         if path == '/api/audits':
@@ -1344,17 +1503,36 @@ class Handler(BaseHTTPRequestHandler):
             if not content:
                 return self.send_json(400, {'error': 'content is required'})
 
-            channel = data.get('channel', 'Website Copy')
             title = data.get('title') or content.splitlines()[0][:70] or 'Brand Review Draft'
+            channel = data.get('channel', 'Website Copy')
+            if not isinstance(channel, str) or len(channel) > 100:
+                return self.send_json(400, {'error': 'Choose a valid content type.'})
+            if len(content) > 250000:
+                return self.send_json(413, {'error': 'Draft is too large to check. Use a text-only file under 250,000 characters.'})
+            if not isinstance(title, str) or len(title) > 150:
+                return self.send_json(400, {'error': 'Audit name must be 150 characters or fewer.'})
+            company_id = accounts.ensure_private_workspace(self.headers)
+            user = accounts.current_user(self.headers) or user
+            # Backfill only records whose creatorUsername unambiguously identifies this account.
+            audits = get_audits()
+            changed_legacy = False
+            for prior in audits:
+                if not prior.get('companyId') and (prior.get('creatorUsername') or '').casefold() == user['username'].casefold():
+                    prior['companyId'] = company_id
+                    changed_legacy = True
+            if changed_legacy and not save_json(DB, audits):
+                return self.send_json(503, {'error': 'Could not preserve the existing audit history. Please retry.'})
             creator = user['name']
             agency = user['organization']
             role = user['role']
 
             # Run BrandWise Multi-Engine Evaluation
-            audit_settings = get_workspace_audit_preferences()
+            audit_settings = get_workspace_audit_preferences(company_id)
             strictness = audit_settings['strictness']
             passing_threshold = audit_settings['passingThreshold']
-            check_result = run_brandwise_checks(content, channel=channel, strictness=strictness)
+            active_claims = claims_for_user(user)
+            active_guidelines = guidelines_for_user(user)
+            check_result = run_brandwise_checks(content, channel=channel, strictness=strictness, _claims=active_claims, _guidelines=active_guidelines)
             if strictness == 'strict':
                 for multiplier in re.finditer(r'\b\d+(?:\.\d+)?\s*x\b', content, re.I):
                     if not any(multiplier.group(0).casefold() in f.get('wrong', '').casefold() for f in check_result['findings']):
@@ -1397,15 +1575,28 @@ class Handler(BaseHTTPRequestHandler):
                         safe['severity'] = severity if severity in ('Low', 'Medium', 'High', 'Critical') else 'Medium'
                         safe_findings.append(safe)
                     ai_findings = review_validation.validate_findings(
-                        safe_findings, content, get_current_ai_reference_claims(), 'In-browser Llama', model_ids[client_ai['model']]
+                        safe_findings, content, [c for c in active_claims if c.get('status') == 'Active'], 'In-browser Llama', model_ids[client_ai['model']]
                     )
+                    for item in ai_findings:
+                        phrase = item.get('wrong', '')
+                        occurrences = len(re.findall(re.escape(phrase), content, re.I)) if phrase else 0
+                        if occurrences != 1:
+                            item['fix'] = ''
+                            item['automaticFixAllowed'] = False
+                            item['needsHumanReview'] = True
                     ai_used = True
                     ai_status = f"{model_ids[client_ai['model']]}; subjective findings require human review."
                 else:
                     ai_status = 'Browser AI response was unavailable or invalid; deterministic checks only.'
             elif data.get('useAI') is True and data.get('aiProvider') == 'gemini':
                 if os.environ.get('GEMINI_API_KEY', '').strip():
-                    ai_findings, ai_status = gemini_review(content, get_current_ai_reference_claims(), get_guidelines())
+                    ai_findings, ai_status = gemini_review(content, [c for c in active_claims if c.get('status') == 'Active'], active_guidelines)
+                    for item in ai_findings:
+                        phrase = item.get('wrong', '')
+                        if not phrase or len(re.findall(re.escape(phrase), content, re.I)) != 1:
+                            item['fix'] = ''
+                            item['automaticFixAllowed'] = False
+                            item['needsHumanReview'] = True
                     ai_used = True
                 else:
                     ai_status = 'Gemini is not configured; deterministic checks only.'
@@ -1414,11 +1605,13 @@ class Handler(BaseHTTPRequestHandler):
             confidence_values = [f.get('confidence') if isinstance(f.get('confidence'), (int, float)) else 100 for f in check_result['findings']]
             check_result['confidence'] = int(sum(confidence_values) / len(confidence_values)) if confidence_values else None
 
-            audit_id = 'BW-' + datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')
+            audit_id = 'BW-' + uuid.uuid4().hex[:16].upper()
+            revision_id = uuid.uuid4().hex
             now_iso = datetime.now(timezone.utc).isoformat()
 
             new_record = {
                 'id': audit_id,
+                'companyId': company_id,
                 'title': title,
                 'channel': channel,
                 'type': channel,
@@ -1433,14 +1626,20 @@ class Handler(BaseHTTPRequestHandler):
                 'passingThreshold': passing_threshold,
                 'passedThreshold': check_result['score'] >= passing_threshold,
                 'settings': {'strictness': strictness, 'passingThreshold': passing_threshold, 'useAI': ai_used, 'aiProvider': data.get('aiProvider') if ai_used else None},
+                'aiProvider': data.get('aiProvider') if ai_used else 'rules',
                 'aiStatus': ai_status,
                 'accessibility': check_result['accessibility'],
                 'content': content,
                 'reference': data.get('reference', 'BrandWise Standard Corporate Claims & Guidelines v3.2'),
                 'findings': check_result['findings'],
+                'claimsSnapshot': active_claims,
+                'guidelinesSnapshot': active_guidelines,
+                'currentRevisionId': revision_id,
+                'approvedRevisionId': None,
                 'revisions': [
                     {
                         'version': 'v1',
+                        'id': revision_id,
                         'author': creator,
                         'timestamp': now_iso,
                         'text': content,
@@ -1456,7 +1655,8 @@ class Handler(BaseHTTPRequestHandler):
 
             audits = get_audits()
             audits.insert(0, new_record)
-            save_json(DB, audits)
+            if not save_json(DB, audits):
+                return self.send_json(503, {'error': 'The audit could not be saved. Your draft is still available in the editor; retry the check.'})
             return self.send_json(201, new_record)
 
         # 2. Audit Actions: Accept, Edit, Dismiss, Report Incorrect Flag, Change State, Add Comment
@@ -1470,7 +1670,11 @@ class Handler(BaseHTTPRequestHandler):
             action_type = data.get('action') # 'accept_fix', 'edit_fix', 'dismiss_fix', 'change_state', 'add_comment', 'report_incorrect_flag'
             now_iso = datetime.now(timezone.utc).isoformat()
             user_name = user['name']
-            if action_type == 'change_state' and user['role'] not in ('Reviewer', 'Brand Manager', 'Admin'):
+            effective_role = (accounts.active_membership(self.headers) or {}).get('role') or user['role']
+            current_revision = target_audit.get('currentRevisionId')
+            if data.get('baseRevisionId') != current_revision:
+                return self.send_json(409, {'error': 'This audit changed since you opened it. Reload the saved revision before applying this action.', 'currentRevisionId': current_revision})
+            if action_type == 'change_state' and effective_role not in ('Reviewer', 'Brand Manager', 'Admin'):
                 return self.send_json(403, {'error': 'Reviewer, Brand Manager, or Admin access required.'})
 
             if action_type in ('accept_fix', 'edit_fix'):
@@ -1481,19 +1685,36 @@ class Handler(BaseHTTPRequestHandler):
                 fix_text = data.get('fixText', finding.get('fix', '')).strip()
                 if not fix_text:
                     return self.send_json(400, {'error': 'Provide replacement wording.'})
+                if action_type == 'accept_fix' and finding.get('automaticFixAllowed') is False:
+                    return self.send_json(409, {'error': 'This wording is repeated or could not be matched uniquely. Select the intended occurrence and edit it manually.'})
                 current_text = target_audit.get('content', '')
                 wrong = finding.get('wrong', '')
-                if wrong and fix_text and wrong in current_text:
-                    new_text = current_text.replace(wrong, fix_text, 1)
-                    target_audit['content'] = new_text
-                    revisions = target_audit.setdefault('revisions', [])
-                    revisions.append({
-                        'version': f"v{len(revisions)+1}",
-                        'author': user_name,
-                        'timestamp': now_iso,
-                        'text': new_text,
-                        'notes': f"{'Edited' if action_type == 'edit_fix' else 'Accepted'} fix for finding {finding_id}: '{wrong}' -> '{fix_text}'"
-                    })
+                positions = [m.start() for m in re.finditer(re.escape(wrong), current_text, re.I)] if wrong else []
+                try:
+                    occurrence_index = int(data.get('occurrenceIndex', 0))
+                except (TypeError, ValueError):
+                    occurrence_index = -1
+                if wrong and fix_text and 0 <= occurrence_index < len(positions):
+                    start = positions[occurrence_index]
+                    new_text = current_text[:start] + fix_text + current_text[start + len(wrong):]
+                    if new_text != current_text:
+                        target_audit['content'] = new_text
+                        target_audit['currentRevisionId'] = uuid.uuid4().hex
+                        target_audit['approvedRevisionId'] = None
+                        revisions = target_audit.setdefault('revisions', [])
+                        revisions.append({
+                            'version': f"v{len(revisions)+1}",
+                            'id': target_audit['currentRevisionId'],
+                            'author': user_name,
+                            'timestamp': now_iso,
+                            'text': new_text,
+                            'notes': f"{'Edited' if action_type == 'edit_fix' else 'Accepted'} fix for finding {finding_id} at occurrence {occurrence_index + 1}"
+                        })
+                        recheck_saved_audit(target_audit)
+                    else:
+                        target_audit['content'] = new_text
+                elif wrong:
+                    return self.send_json(409, {'error': 'The selected occurrence no longer exists in the saved draft. Reload the audit and try again.'})
                 finding['actionStatus'] = 'edited' if action_type == 'edit_fix' else 'accepted'
                 finding['appliedFix'] = fix_text
                 target_audit['auditTrail'].append({
@@ -1538,26 +1759,28 @@ class Handler(BaseHTTPRequestHandler):
                 old_state = target_audit.get('status')
                 allowed = {'Ready for review', 'Review required', 'In review', 'Changes requested', 'Auto-checked'}
                 if new_state == 'Changes requested':
-                    if user['role'] not in ('Reviewer', 'Brand Manager', 'Admin') or old_state not in allowed:
+                    if effective_role not in ('Reviewer', 'Brand Manager', 'Admin') or old_state not in allowed:
                         return self.send_json(403, {'error': 'Only a reviewer or brand manager can request changes on an active review.'})
                 elif new_state == 'Approved':
-                    if user['role'] not in ('Reviewer', 'Brand Manager', 'Admin'):
+                    if effective_role not in ('Reviewer', 'Brand Manager', 'Admin'):
                         return self.send_json(403, {'error': 'Reviewer or Brand Manager approval is required.'})
                     if old_state not in allowed:
                         return self.send_json(409, {'error': 'This audit is not in a state that can be approved.'})
-                    threshold = int(target_audit.get('passingThreshold', get_workspace_audit_preferences()['passingThreshold']))
-                    blocking = [f for f in target_audit.get('findings', []) if f.get('severity') in ('Critical', 'High') and f.get('actionStatus', 'pending') == 'pending']
-                    if float(target_audit.get('score', 0)) < threshold or blocking:
-                        return self.send_json(409, {'error': f"Resolve critical/high findings and meet the {threshold}% passing threshold before approval."})
+                    threshold = int(target_audit.get('passingThreshold', get_workspace_audit_preferences(user.get('activeCompanyId'))['passingThreshold']))
+                    pending = [f for f in target_audit.get('findings', []) if f.get('actionStatus', 'pending') == 'pending']
+                    if float(target_audit.get('score', 0)) < threshold or pending:
+                        return self.send_json(409, {'error': f"Disposition every finding and meet the {threshold}% passing threshold before approval."})
                 elif new_state == 'Published':
-                    if user['role'] not in ('Reviewer', 'Brand Manager', 'Admin'):
+                    if effective_role not in ('Reviewer', 'Brand Manager', 'Admin'):
                         return self.send_json(403, {'error': 'Reviewer or Brand Manager publishing permission is required.'})
                     pending = [f for f in target_audit.get('findings', []) if f.get('actionStatus', 'pending') == 'pending']
-                    if old_state != 'Approved' or pending:
+                    if old_state != 'Approved' or target_audit.get('approvedRevisionId') != target_audit.get('currentRevisionId') or pending:
                         return self.send_json(409, {'error': 'Approve this audit and resolve or disposition every finding before publishing.'})
                 else:
                     return self.send_json(400, {'error': 'Unsupported audit state transition.'})
                 target_audit['status'] = new_state
+                if new_state == 'Approved':
+                    target_audit['approvedRevisionId'] = target_audit.get('currentRevisionId')
                 target_audit.setdefault('auditTrail', []).append({
                     'action': f"State Changed: {old_state} -> {new_state}",
                     'user': user_name,
@@ -1583,7 +1806,8 @@ class Handler(BaseHTTPRequestHandler):
                         'note': comment_text[:60]
                     })
 
-            save_json(DB, audits)
+            if not save_json(DB, audits):
+                return self.send_json(503, {'error': 'This action could not be saved. Please retry.'})
             return self.send_json(200, target_audit)
 
         # 3. Add or Update Claim in Ledger
@@ -1591,7 +1815,7 @@ class Handler(BaseHTTPRequestHandler):
             statement = data.get('statement', '').strip()
             if not statement:
                 return self.send_json(400, {'error': 'statement is required'})
-            claims = get_claims()
+            claims = claims_for_user(user)
             cid = data.get('id') or f"CLM-{len(claims)+1:03d}"
             existing = next((c for c in claims if c['id'] == cid), None)
             if existing:
@@ -1600,12 +1824,14 @@ class Handler(BaseHTTPRequestHandler):
                 data['id'] = cid
                 data.setdefault('status', 'Active')
                 claims.append(data)
-            save_json(CLAIMS_DB, claims)
+            if not save_company_json(user, 'claims-data.json', CLAIMS_DB, claims):
+                return self.send_json(503, {'error': 'Could not save claims. Retry without closing this page.'})
             return self.send_json(200, {'success': True, 'claim': data})
 
         # 4. Update Guidelines
         if path == '/api/guidelines':
-            save_json(GUIDELINES_DB, data)
+            if not save_company_json(user, 'guidelines-data.json', GUIDELINES_DB, data):
+                return self.send_json(503, {'error': 'Could not save guidelines. Retry without closing this page.'})
             return self.send_json(200, {'success': True, 'guidelines': data})
 
         # 5. API Keys Configuration & Management
@@ -1625,11 +1851,16 @@ class Handler(BaseHTTPRequestHandler):
 
         # 7. Reset Database to Default Proposal Seeds
         if path == '/api/reset':
-            save_json(DB, DEFAULT_AUDITS)
-            save_json(CLAIMS_DB, DEFAULT_CLAIMS)
-            save_json(GUIDELINES_DB, DEFAULT_GUIDELINES)
-            save_json(AUDIT_PREFERENCES_DB, DEFAULT_AUDIT_PREFERENCES)
-            return self.send_json(200, {'ok': True, 'message': 'Demo data reset to official BrandWise proposal seed'})
+            audits = get_audits()
+            real_audits = [item for item in audits if not item.get('sampleData')]
+            if not save_json(DB, DEFAULT_AUDITS + real_audits):
+                return self.send_json(503, {'error': 'Demo reset failed; saved audits were preserved.'})
+            if not save_company_json(user, 'claims-data.json', CLAIMS_DB, DEFAULT_CLAIMS) or not save_company_json(user, 'guidelines-data.json', GUIDELINES_DB, DEFAULT_GUIDELINES):
+                return self.send_json(503, {'error': 'Demo data reset did not finish; saved audits were preserved.'})
+            company_id = user.get('activeCompanyId')
+            preference_path = company_data_path(company_id, 'audit-preferences.json') if company_id else AUDIT_PREFERENCES_DB
+            save_json(preference_path, DEFAULT_AUDIT_PREFERENCES)
+            return self.send_json(200, {'ok': True, 'message': 'Demo data reset. Real audit records were preserved.'})
 
         self.send_error(404, "Endpoint not found")
 
