@@ -15,6 +15,7 @@ import time
 import urllib.error
 import urllib.request
 import database
+import uuid
 
 try:
     import psycopg
@@ -49,7 +50,8 @@ def connect():
       work TEXT NOT NULL, responsibilities TEXT NOT NULL, salt BLOB NOT NULL, password_hash BLOB NOT NULL
     );
     CREATE TABLE IF NOT EXISTS sessions (
-      token BLOB PRIMARY KEY, username TEXT NOT NULL, expires INTEGER NOT NULL
+      token BLOB PRIMARY KEY, username TEXT NOT NULL, expires INTEGER NOT NULL,
+      active_company_id TEXT
     );
     CREATE TABLE IF NOT EXISTS email_verifications (
       email TEXT PRIMARY KEY COLLATE NOCASE,
@@ -66,6 +68,19 @@ def connect():
       ip TEXT NOT NULL,
       attempted_at INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS companies (
+      id TEXT PRIMARY KEY, name TEXT NOT NULL, owner_username TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS company_memberships (
+      company_id TEXT NOT NULL, username TEXT NOT NULL, role TEXT NOT NULL,
+      joined_at INTEGER NOT NULL, PRIMARY KEY(company_id, username)
+    );
+    CREATE TABLE IF NOT EXISTS company_invitations (
+      code_hash BLOB PRIMARY KEY, company_id TEXT NOT NULL,
+      email TEXT NOT NULL COLLATE NOCASE, role TEXT NOT NULL,
+      expires INTEGER NOT NULL, created_by TEXT NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS password_resets (
       email TEXT PRIMARY KEY COLLATE NOCASE,
       code_hash BLOB NOT NULL,
@@ -77,9 +92,11 @@ def connect():
       sends_in_window INTEGER NOT NULL DEFAULT 1
     );
     """)
+    columns = {row['name'] for row in db.execute('PRAGMA table_info(sessions)').fetchall()}
+    if 'active_company_id' not in columns:
+        db.execute('ALTER TABLE sessions ADD COLUMN active_company_id TEXT')
     return db
 
-# Retained for compatibility with audit tooling; sign-in no longer enforces a timed lockout.
 LOGIN_WINDOW_SECONDS = 900
 LOGIN_MAX_FAILURES = 5
 
@@ -364,8 +381,8 @@ def reset_password_with_email_otp(raw_email, code, new_password):
     email = normalize_email(raw_email)
     if not isinstance(code, str) or not re.fullmatch(r'\d{6}', code.strip()):
         raise ValueError('Enter the six-digit code from your email.')
-    if not isinstance(new_password, str) or not 4 <= len(new_password) <= 128:
-        raise ValueError('Use a new password between 4 and 128 characters.')
+    if not isinstance(new_password, str) or not 15 <= len(new_password) <= 128:
+        raise ValueError('Use a new password between 15 and 128 characters.')
     now = int(time.time())
     with closing(connect()) as db:
         db.execute('BEGIN IMMEDIATE')
@@ -404,8 +421,8 @@ def register(data):
     email = normalize_email(email)
     if role not in ROLES or any(not value or len(value) > 500 for value in (name, organization, work, responsibilities)):
         raise ValueError('Complete the profile questions and select a role.')
-    if not 4 <= len(password) <= 128:
-        raise ValueError('Use a password between 4 and 128 characters.')
+    if not 15 <= len(password) <= 128:
+        raise ValueError('Use a password between 15 and 128 characters.')
     if username.casefold() == 'admin':
         raise ValueError('That username is reserved.')
     salt = secrets.token_bytes(16)
@@ -421,6 +438,84 @@ def register(data):
         if _is_integrity_error(exc):
             raise ValueError('That username or email is already registered.') from None
         raise
+
+def firebase_user_from_token(id_token):
+    """Validate a Firebase ID token through Identity Toolkit (no service key needed)."""
+    api_key = os.environ.get('FIREBASE_API_KEY', 'AIzaSyB5ZWrXltQKygEcdeED10Q9vkIpdQn8CMk').strip()
+    if not isinstance(id_token, str) or not id_token or len(id_token) > 8192:
+        raise ValueError('Sign in again with Firebase and retry.')
+    request = urllib.request.Request(
+        f'https://identitytoolkit.googleapis.com/v1/accounts:lookup?key={api_key}',
+        data=json.dumps({'idToken': id_token}).encode('utf-8'),
+        headers={'Content-Type': 'application/json'}, method='POST')
+    try:
+        with urllib.request.urlopen(request, timeout=12) as response:
+            payload = json.loads(response.read(65536).decode('utf-8'))
+        users = payload.get('users') or []
+        if not users:
+            raise ValueError('Firebase did not return a signed-in user.')
+        user = users[0]
+        return {'uid': user.get('localId'), 'email': normalize_email(user.get('email')), 'email_verified': bool(user.get('emailVerified'))}
+    except urllib.error.HTTPError as exc:
+        raise ValueError('Firebase session expired or invalid. Sign in again.') from exc
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        raise ValueError('Could not reach Firebase to verify your sign-in. Try again.') from exc
+
+def firebase_register(data):
+    fields = ('username', 'name', 'role', 'organization', 'work', 'responsibilities')
+    if not isinstance(data, dict) or any(not isinstance(data.get(field), str) for field in fields):
+        raise ValueError('Complete all registration fields.')
+    identity = firebase_user_from_token(data.get('idToken'))
+    if not identity['email_verified']:
+        raise ValueError('Verify your email from the Firebase email before registering.')
+    clean = dict(data)
+    clean['email'] = identity['email']
+    clean['password'] = secrets.token_urlsafe(48)
+    username, name, role, organization, work, responsibilities = (clean[field].strip() for field in fields)
+    email = clean['email']
+    if not re.fullmatch(r'[A-Za-z0-9_]{3,32}', username):
+        raise ValueError('Use 3 to 32 letters, numbers, or underscores for your username.')
+    if role not in ROLES or any(not value or len(value) > 500 for value in (name, organization, work, responsibilities)):
+        raise ValueError('Complete the profile questions and select a role.')
+    if username.casefold() == 'admin':
+        raise ValueError('That username is reserved.')
+    salt = secrets.token_bytes(16)
+    try:
+        with closing(connect()) as db, db:
+            db.execute('INSERT INTO accounts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                       (username, email, name, role, organization, work, responsibilities, salt, digest(clean['password'], salt)))
+            token = secrets.token_urlsafe(32)
+            now = int(time.time())
+            db.execute('INSERT INTO sessions (token, username, expires, active_company_id) VALUES (?, ?, ?, NULL)',
+                       (sha256(token.encode()).digest(), username, now + SESSION_AGE))
+    except Exception as exc:
+        if _is_integrity_error(exc):
+            raise ValueError('That username or email is already registered.') from None
+        raise
+    return token
+
+def firebase_session(id_token):
+    identity = firebase_user_from_token(id_token)
+    if not identity['email_verified']:
+        raise ValueError('Verify your email address before signing in.')
+    with closing(connect()) as db, db:
+        row = db.execute('SELECT username FROM accounts WHERE lower(email)=lower(?)', (identity['email'],)).fetchone()
+        if not row:
+            raise ValueError('No BrandWise profile is registered for this email. Create an account first.')
+        token = secrets.token_urlsafe(32)
+        now = int(time.time())
+        db.execute('DELETE FROM sessions WHERE expires <= ?', (now,))
+        db.execute('INSERT INTO sessions (token, username, expires, active_company_id) VALUES (?, ?, ?, NULL)',
+                   (sha256(token.encode()).digest(), row['username'], now + SESSION_AGE))
+    return token
+
+def email_for_login(identifier):
+    if not isinstance(identifier, str) or len(identifier) > 254:
+        return None
+    with closing(connect()) as db:
+        row = db.execute('SELECT email FROM accounts WHERE lower(username)=lower(?) OR lower(email)=lower(?)',
+                         (identifier.strip(), identifier.strip())).fetchone()
+        return row['email'] if row else None
 
 def login(data):
     identifier, password = data.get('username'), data.get('password')
@@ -438,7 +533,7 @@ def login(data):
         token = secrets.token_urlsafe(32)
         now = int(time.time())
         db.execute('DELETE FROM sessions WHERE expires <= ?', (now,))
-        db.execute('INSERT INTO sessions VALUES (?, ?, ?)', (sha256(token.encode()).digest(), row['username'], now + SESSION_AGE))
+        db.execute('INSERT INTO sessions (token, username, expires, active_company_id) VALUES (?, ?, ?, NULL)', (sha256(token.encode()).digest(), row['username'], now + SESSION_AGE))
         return token
 
 def cookie_token(headers):
@@ -454,8 +549,13 @@ def current_user(headers):
         return None
     with closing(connect()) as db:
         row = db.execute("""SELECT accounts.username, accounts.email, accounts.name, accounts.role,
-                                   accounts.organization, accounts.work, accounts.responsibilities
+                                   accounts.organization, accounts.work, accounts.responsibilities,
+                                   sessions.active_company_id AS activeCompanyId,
+                                   company_memberships.role AS companyRole,
+                                   companies.name AS companyName
                             FROM sessions JOIN accounts USING (username)
+                            LEFT JOIN company_memberships ON company_memberships.company_id = sessions.active_company_id AND company_memberships.username = accounts.username
+                            LEFT JOIN companies ON companies.id = sessions.active_company_id
                             WHERE sessions.token = ? AND sessions.expires > ?""", (token, int(time.time()))).fetchone()
     return dict(row) if row else None
 
@@ -465,6 +565,135 @@ def list_users():
         rows = db.execute("""SELECT username, email, name, role, organization, work, responsibilities
                             FROM accounts ORDER BY lower(role), lower(name)""").fetchall()
     return [dict(row) for row in rows]
+
+
+def list_workspaces(headers):
+    user = current_user(headers)
+    if not user:
+        raise ValueError('Sign in first.')
+    with closing(connect()) as db:
+        rows = db.execute("""SELECT companies.id, companies.name, company_memberships.role
+                             FROM company_memberships JOIN companies ON companies.id=company_memberships.company_id
+                             WHERE company_memberships.username=? ORDER BY lower(companies.name)""",
+                          (user['username'],)).fetchall()
+    return [dict(row) for row in rows]
+
+
+def list_workspace_users(headers):
+    user = current_user(headers)
+    membership = active_membership(headers)
+    if not user or not membership or membership['role'] != 'Admin':
+        raise PermissionError('Only a company admin can open Team Overview.')
+    with closing(connect()) as db:
+        rows = db.execute("""SELECT accounts.username, accounts.email, accounts.name, accounts.role,
+                                   accounts.organization, accounts.work, accounts.responsibilities,
+                                   company_memberships.role AS companyRole
+                            FROM company_memberships JOIN accounts USING (username)
+                            WHERE company_memberships.company_id=? ORDER BY lower(accounts.name)""",
+                          (membership['companyId'],)).fetchall()
+    return [dict(row) for row in rows]
+
+
+def ensure_private_workspace(headers, display_name=None):
+    user = current_user(headers)
+    if not user:
+        raise ValueError('Sign in first.')
+    memberships = list_workspaces(headers)
+    if memberships:
+        if not user.get('activeCompanyId'):
+            switch_workspace(headers, memberships[0]['id'])
+            user = current_user(headers)
+        return user.get('activeCompanyId')
+    company_id = 'private-' + uuid.uuid4().hex
+    name = (display_name or f"{user['name']}'s Private Workspace").strip()[:120]
+    now = int(time.time())
+    with closing(connect()) as db, db:
+        db.execute('INSERT INTO companies (id,name,owner_username,created_at) VALUES (?,?,?,?)',
+                   (company_id, name, user['username'], now))
+        db.execute('INSERT INTO company_memberships (company_id,username,role,joined_at) VALUES (?,?,?,?)',
+                   (company_id, user['username'], 'Admin', now))
+        db.execute('UPDATE sessions SET active_company_id=? WHERE token=?',
+                   (company_id, cookie_token(headers)))
+    return company_id
+
+
+def create_workspace(headers, name):
+    user = current_user(headers)
+    if not user:
+        raise ValueError('Sign in first.')
+    if not isinstance(name, str) or not name.strip() or len(name.strip()) > 120:
+        raise ValueError('Enter a workspace name between 1 and 120 characters.')
+    company_id = 'company-' + uuid.uuid4().hex
+    now = int(time.time())
+    with closing(connect()) as db, db:
+        db.execute('INSERT INTO companies (id,name,owner_username,created_at) VALUES (?,?,?,?)',
+                   (company_id, name.strip(), user['username'], now))
+        db.execute('INSERT INTO company_memberships (company_id,username,role,joined_at) VALUES (?,?,?,?)',
+                   (company_id, user['username'], 'Admin', now))
+        db.execute('UPDATE sessions SET active_company_id=? WHERE token=?',
+                   (company_id, cookie_token(headers)))
+    return {'id': company_id, 'name': name.strip(), 'role': 'Admin'}
+
+
+def switch_workspace(headers, company_id):
+    user = current_user(headers)
+    if not user:
+        raise ValueError('Sign in first.')
+    with closing(connect()) as db, db:
+        member = db.execute('SELECT 1 FROM company_memberships WHERE company_id=? AND username=?',
+                             (company_id, user['username'])).fetchone()
+        if not member:
+            raise ValueError('You are not a member of that workspace.')
+        db.execute('UPDATE sessions SET active_company_id=? WHERE token=?',
+                   (company_id, cookie_token(headers)))
+    return current_user(headers)
+
+
+def active_membership(headers):
+    user = current_user(headers)
+    if not user or not user.get('activeCompanyId') or not user.get('companyRole'):
+        return None
+    return {'companyId': user['activeCompanyId'], 'role': user['companyRole'], 'username': user['username']}
+
+
+def create_workspace_invitation(headers, email, role):
+    user = current_user(headers)
+    membership = active_membership(headers)
+    if not user or not membership or membership['role'] != 'Admin':
+        raise PermissionError('Only a company admin can invite members.')
+    email = normalize_email(email)
+    if role not in ROLES:
+        raise ValueError('Choose a valid member role.')
+    code = secrets.token_urlsafe(24)
+    digest_code = sha256(code.encode()).digest()
+    with closing(connect()) as db, db:
+        db.execute('INSERT INTO company_invitations (code_hash,company_id,email,role,expires,created_by) VALUES (?,?,?,?,?,?)',
+                   (digest_code, membership['companyId'], email, role, int(time.time()) + 7 * 86400, user['username']))
+    return {'code': code, 'email': email, 'role': role, 'expiresInDays': 7}
+
+
+def join_workspace_invitation(headers, code):
+    user = current_user(headers)
+    if not user or not isinstance(code, str) or not code.strip():
+        raise ValueError('Sign in and enter an invitation code.')
+    token_hash = sha256(code.strip().encode()).digest()
+    now = int(time.time())
+    with closing(connect()) as db:
+        db.execute('BEGIN IMMEDIATE')
+        invite = db.execute('SELECT * FROM company_invitations WHERE code_hash=?', (token_hash,)).fetchone()
+        if not invite or invite['expires'] < now:
+            db.rollback()
+            raise ValueError('This invitation is invalid or expired.')
+        if invite['email'].casefold() != user['email'].casefold():
+            db.rollback()
+            raise ValueError('Sign in with the verified email address this invitation was sent to.')
+        db.execute('INSERT INTO company_memberships (company_id,username,role,joined_at) VALUES (?,?,?,?) ON CONFLICT(company_id,username) DO UPDATE SET role=excluded.role',
+                   (invite['company_id'], user['username'], invite['role'], now))
+        db.execute('DELETE FROM company_invitations WHERE code_hash=?', (token_hash,))
+        db.execute('UPDATE sessions SET active_company_id=? WHERE token=?',
+                   (invite['company_id'], cookie_token(headers)))
+        db.commit()
+    return current_user(headers)
 
 def logout(headers):
     with closing(connect()) as db, db:
@@ -480,12 +709,9 @@ def update_profile(headers, data):
     username = data['username'].strip()
     email = normalize_email(data['email'])
     name, organization, work, responsibilities = (data[field].strip() for field in fields[2:])
-    role = data.get('role', user['role'])
-    if user['role'] == 'Admin':
-        if role != 'Admin':
-            raise ValueError('The Admin role is managed separately and cannot be changed here.')
-    elif role not in ROLES:
-        raise ValueError('Choose a valid work role.')
+    role = user['role']
+    if data.get('role', role) != role:
+        raise ValueError('Roles are granted by a company admin and cannot be changed in profile settings.')
     if not re.fullmatch(r'[A-Za-z0-9_]{3,32}', username):
         raise ValueError('Use 3 to 32 letters, numbers, or underscores for your username.')
     if username.casefold() == 'admin' and user['role'] != 'Admin':
@@ -517,8 +743,8 @@ def change_password(headers, current_password, new_password):
         raise ValueError('Sign in first.')
     if not isinstance(current_password, str) or not current_password or len(current_password) > 128:
         raise ValueError('Enter your current password.')
-    if not isinstance(new_password, str) or not 4 <= len(new_password) <= 128:
-        raise ValueError('Use a new password between 4 and 128 characters.')
+    if not isinstance(new_password, str) or not 15 <= len(new_password) <= 128:
+        raise ValueError('Use a new password between 15 and 128 characters.')
     token = cookie_token(headers)
     with closing(connect()) as db:
         db.execute('BEGIN IMMEDIATE')
@@ -550,6 +776,11 @@ def delete_account(headers, password):
         db.execute('DELETE FROM sessions WHERE username=?', (user['username'],))
         db.execute('DELETE FROM email_verifications WHERE email=?', (row['email'],))
         db.execute('DELETE FROM password_resets WHERE email=?', (row['email'],))
+        # Keep audit history for traceability, but remove the deleted user from
+        # all company memberships and invitations so the account has no access.
+        db.execute('DELETE FROM company_memberships WHERE username=?', (user['username'],))
+        db.execute('DELETE FROM company_invitations WHERE lower(email)=lower(?) OR created_by=?',
+                   (row['email'], user['username']))
         db.execute('DELETE FROM accounts WHERE username=?', (user['username'],))
         db.commit()
     return True
