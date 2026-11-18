@@ -1181,8 +1181,7 @@ html[data-signed-in] #authPageHeader { display: none !important; }
 .profile-password-status { grid-column:1/-1; min-height:0; margin:0; color:var(--text-muted); font-size:12px; }
 .profile-password-status:empty { display:none; }
 .profile-password-reset p { grid-column:1/-1; margin:0 0 4px; color:var(--text-muted); font-size:12px; }
-.profile-password-reset .email-entry-row, .profile-password-reset > div#profileResetFields { grid-column:1/-1; }
-.profile-password-reset #profileResetFields { display:grid; grid-template-columns:1fr; gap:8px; }
+.profile-password-reset .email-entry-row { grid-column:1/-1; }
 .profile-password-reset[hidden] { display:none !important; }
 .profile-password-reset label { display:block; margin-top:4px; }
 .profile-password-reset button { justify-self:start; margin:4px 0 0; }
@@ -1404,11 +1403,8 @@ html[data-signed-in] #accountGate, #accountGate [hidden] { display: none !import
           <button class="btn-pill-ghost" id="sendEmailOtp" type="button">Verify</button>
         </div>
         <div class="email-otp-panel" id="emailOtpPanel" hidden>
-          <label for="emailOtpCode">6-digit email code</label>
-          <div class="email-entry-row">
-            <input id="emailOtpCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="Enter code" disabled>
-            <button class="btn-pill-primary" id="confirmEmailOtp" type="button" disabled>Confirm</button>
-          </div>
+          <p>Open the Firebase verification email, follow its link, return here, then confirm.</p>
+          <div class="email-entry-row"><button class="btn-pill-primary" id="confirmEmailOtp" type="button">I verified my email</button></div>
         </div>
         <p class="email-verification-status" id="emailVerificationStatus" role="status" aria-live="polite"></p>
       </div>
@@ -1423,20 +1419,11 @@ html[data-signed-in] #accountGate, #accountGate [hidden] { display: none !import
     <p id="accountError" role="status"></p>
   </form>
   <form id="forgotPasswordForm" hidden>
-    <p style="margin:0 0 4px;">Enter your account email. If it belongs to an account, we’ll send a one-time reset code.</p>
+    <p style="margin:0 0 4px;">Enter your account email. Firebase will send a secure password reset link if the address belongs to an account.</p>
     <label for="passwordResetEmail">Email</label>
     <div class="email-entry-row">
       <input id="passwordResetEmail" type="email" required maxlength="254" autocomplete="email" placeholder="you@example.com">
-      <button class="btn-pill-ghost" id="sendPasswordResetCode" type="button">Send code</button>
-    </div>
-    <div id="passwordResetFields" hidden>
-      <label for="passwordResetCode">6-digit verification code</label>
-      <input id="passwordResetCode" type="text" required inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="Enter the code from your email">
-      <label for="passwordResetNewPassword">New password</label>
-      <input id="passwordResetNewPassword" type="password" required minlength="4" maxlength="128" autocomplete="new-password">
-      <label for="passwordResetConfirmPassword">Confirm new password</label>
-      <input id="passwordResetConfirmPassword" type="password" required minlength="4" maxlength="128" autocomplete="new-password">
-      <div class="reset-password-actions"><button class="btn-pill-primary" id="submitPasswordReset" type="submit">Save new password</button></div>
+      <button class="btn-pill-ghost" id="sendPasswordResetCode" type="button">Send reset link</button>
     </div>
     <div class="reset-password-actions"><button class="btn-pill-ghost" id="backToSignIn" type="button">Back to sign in</button></div>
     <p id="forgotPasswordStatus" role="status" aria-live="polite"></p>
@@ -1539,10 +1526,6 @@ html[data-signed-in] #accountGate, #accountGate [hidden] { display: none !import
         Support
       </button>
 
-      <button class="btn-quick-scan" id="btnTopQuickScan" type="button">
-        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-        Run Quick Scan
-      </button>
 
       <div class="profile-menu" id="profileMenu">
         <button class="user-avatar" id="topAvatar" type="button" aria-label="Open my profile" aria-haspopup="dialog" aria-expanded="false" aria-controls="profilePopover">A</button>
@@ -1593,24 +1576,18 @@ html[data-signed-in] #accountGate, #accountGate [hidden] { display: none !import
           <h4 id="profilePasswordHeading">Password &amp; sign-in</h4>
           <form id="profileChangePasswordForm" class="profile-password-form">
             <label for="profileCurrentPassword">Current password</label>
-            <input id="profileCurrentPassword" type="password" autocomplete="current-password" minlength="4" maxlength="128" required>
+            <input id="profileCurrentPassword" type="password" autocomplete="current-password" minlength="1" maxlength="128" required>
             <label for="profileNewPassword">New password</label>
-            <input id="profileNewPassword" type="password" autocomplete="new-password" minlength="4" maxlength="128" required>
+            <input id="profileNewPassword" type="password" autocomplete="new-password" minlength="15" maxlength="128" required>
             <label for="profileConfirmPassword">Confirm new password</label>
-            <input id="profileConfirmPassword" type="password" autocomplete="new-password" minlength="4" maxlength="128" required>
+            <input id="profileConfirmPassword" type="password" autocomplete="new-password" minlength="15" maxlength="128" required>
             <div class="profile-password-actions"><button class="btn-pill-primary" id="saveNewPassword" type="submit">Change password</button><button class="btn-pill-ghost" id="profileForgotPassword" type="button">Forgot password?</button></div>
             <p class="profile-password-status" id="profilePasswordStatus" role="status" aria-live="polite"></p>
           </form>
           <form id="profilePasswordResetForm" class="profile-password-reset" hidden>
-            <p>Verify your email to reset your password. A one-time code will be sent to the email on your profile.</p>
+            <p>Firebase sends a secure password reset link to your account email.</p>
             <label for="profileResetEmail">Email</label>
-            <div class="email-entry-row"><input id="profileResetEmail" type="email" autocomplete="email" required maxlength="254"><button class="btn-pill-ghost" id="profileSendResetCode" type="button">Send code</button></div>
-            <div id="profileResetFields" hidden>
-              <label for="profileResetCode">6-digit email code</label><input id="profileResetCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" required>
-              <label for="profileResetNewPassword">New password</label><input id="profileResetNewPassword" type="password" autocomplete="new-password" minlength="4" maxlength="128" required>
-              <label for="profileResetConfirmPassword">Confirm new password</label><input id="profileResetConfirmPassword" type="password" autocomplete="new-password" minlength="4" maxlength="128" required>
-              <button class="btn-pill-primary" type="submit" id="profileResetSubmit">Reset password</button>
-            </div>
+            <div class="email-entry-row"><input id="profileResetEmail" type="email" autocomplete="email" required maxlength="254"><button class="btn-pill-ghost" id="profileSendResetCode" type="button">Send reset link</button></div>
             <div class="profile-password-actions"><button class="btn-pill-ghost" type="button" id="cancelProfilePasswordReset">Back to change password</button></div>
             <p class="profile-password-status" id="profilePasswordResetStatus" role="status" aria-live="polite"></p>
           </form>
@@ -1727,11 +1704,20 @@ html[data-signed-in] #accountGate, #accountGate [hidden] { display: none !import
       <div class="white-panel" style="display:flex;flex-direction:column;gap:12px;">
         <div class="panel-kicker-head">
           <h3><span class="badge-num">01</span> Content To Check</h3>
-          <span class="pill-tag pill-orange" id="docStatePill">UNDER REVIEW</span>
+          <span class="pill-tag pill-gray" id="docStatePill">WAITING FOR DRAFT</span>
         </div>
         <p style="font-size:12px;color:var(--text-muted);">Draft claims, advertising hooks, and hero statements for automated compliance verification.</p>
         
-        <textarea class="workspace-textarea" id="workspaceInput" placeholder="Paste marketing copy here...">"Lofty Creative Lab guarantees 10x faster engagement across omni-channel campaigns using patented generative creative synthesis with 100% cloud zero-carbon footprint."</textarea>
+        <label for="auditTitleInput" style="font-size:11px;font-weight:700;">Audit name</label>
+        <input id="auditTitleInput" maxlength="150" placeholder="Name this audit (optional)">
+        <button type="button" class="btn-pill-ghost" id="btnNewAudit" style="align-self:flex-start;margin-top:6px;">Start new audit</button>
+        <label for="workspaceInput" style="font-size:11px;font-weight:700;">Draft content</label>
+        <textarea class="workspace-textarea" id="workspaceInput" placeholder="Paste marketing copy here..."></textarea>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:6px 0;">
+          <input type="file" id="auditDraftFile" accept=".txt,.md,.csv,.pdf,.docx" hidden>
+          <button type="button" class="btn-pill-ghost" id="importAuditDraftButton">Import draft</button>
+          <span id="draftImportStatus" role="status" aria-live="polite" style="font-size:11px;color:var(--text-muted);margin:0;">Paste a draft to begin. Imported text is shown here before you run checks.</span>
+        </div>
         
         <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--text-dim);">
           <span id="charCountLabel">⏱ 18 words · text pasted</span>
@@ -1756,16 +1742,16 @@ html[data-signed-in] #accountGate, #accountGate [hidden] { display: none !import
         <div>
           <div class="panel-kicker-head">
             <h3><span class="badge-num">02</span> Audit Report</h3>
-            <span class="pill-tag pill-blue" id="reportHeaderBadge">READY FOR REVIEW</span>
+            <span class="pill-tag pill-gray" id="reportHeaderBadge">NO RESULTS</span>
           </div>
 
           <div style="display:flex;align-items:baseline;justify-content:space-between;margin:10px 0 6px;">
             <div>
               <small style="font-size:10px;font-weight:700;color:var(--text-dim);text-transform:uppercase;">AVERAGE FINDING CONFIDENCE</small>
-              <div style="font-family:'Barlow Condensed',sans-serif;font-size:36px;font-weight:900;color:var(--navy);line-height:1;" id="reportConfidenceVal">-- <span style="font-size:12px;font-family:'Inter',sans-serif;font-weight:600;color:var(--text-muted);">not calibrated</span></div>
-              <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Compliance score: <b id="reportComplianceVal">--</b> · not a legal approval</div>
+              <div style="font-family:'Barlow Condensed',sans-serif;font-size:36px;font-weight:900;color:var(--navy);line-height:1;" id="reportConfidenceVal">—</div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Compliance score: <b id="reportComplianceVal">No audit results yet</b></div>
             </div>
-            <div style="width:28px;height:28px;border-radius:50%;background:var(--blue-light);color:var(--blue-text, var(--blue));display:flex;align-items:center;justify-content:center;">
+            <div id="reportResultIcon" style="width:28px;height:28px;border-radius:50%;background:var(--blue-light);color:var(--blue-text, var(--blue));display:flex;align-items:center;justify-content:center;">
               <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             </div>
           </div>
@@ -1774,10 +1760,10 @@ html[data-signed-in] #accountGate, #accountGate [hidden] { display: none !import
           <div id="governanceLifecycle" style="display:flex;align-items:center;justify-content:space-between;background:var(--card-elevated);border:1px solid var(--line);border-radius:var(--radius-pill);padding:4px 10px;margin-bottom:12px;font-size:11px;">
             <div style="display:flex;align-items:center;gap:6px;">
               <span style="font-size:9.5px;font-weight:800;color:var(--text-dim);text-transform:uppercase;">STAGE:</span>
-              <span class="pill-tag pill-orange" id="lifecycleBadge" style="font-size:9px;padding:2px 8px;">In review</span>
+              <span class="pill-tag pill-gray" id="lifecycleBadge" style="font-size:9px;padding:2px 8px;">Not started</span>
             </div>
             <div style="display:flex;gap:4px;" id="governanceActionButtons">
-              <button type="button" class="btn-pill-ghost" style="padding:2px 8px;font-size:10px;" id="btnReqChanges">Request Changes</button>
+              <button type="button" class="btn-pill-ghost" style="padding:2px 8px;font-size:10px;" id="btnReqChanges" disabled>Request Changes</button>
               <button type="button" class="btn-pill-primary" style="padding:2px 8px;font-size:10px;" id="btnApproveDraft" disabled>Approve</button>
               <button type="button" class="btn-pill-orange" style="padding:2px 8px;font-size:10px;" id="btnPublishDraft" disabled>Publish</button>
             </div>
@@ -1800,15 +1786,7 @@ html[data-signed-in] #accountGate, #accountGate [hidden] { display: none !import
           </div>
 
           <!-- Suggestion Box with One-Click Fix -->
-          <div class="suggestion-box" id="reportSuggestionBox">
-            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
-            <div style="flex:1;">
-              <b>Suggestion:</b> Replace <i>"guarantees 10x"</i> with <i>"accelerates engagement by up to 20%"</i> (Backed by Claim CLM-001).
-              <div style="margin-top:6px;">
-                <button type="button" class="btn-pill-orange" style="padding:2px 8px;font-size:10px;" id="btnApplyTopFix">Apply One-Click Fix</button>
-              </div>
-            </div>
-          </div>
+          <div class="suggestion-box" id="reportSuggestionBox" hidden></div>
 
           <!-- Dynamic Findings Accordion -->
           <div class="findings-accordion" id="findingsContainer">
@@ -1856,9 +1834,6 @@ html[data-signed-in] #accountGate, #accountGate [hidden] { display: none !import
         <p>Your approved facts, core messaging rules, and legal guardrails in one playful spot.</p>
       </div>
       <div style="display:flex;gap:8px;">
-        <button class="btn-pill-primary" id="btnGuidelinesScan">Quick Scan</button>
-        <button class="btn-pill-ghost" id="btnJsonWebhookModal">JSON Webhook</button>
-        <button class="btn-pill-ghost" id="btnExportApiBtn">Export API</button>
       </div>
     </div>
 
@@ -2112,8 +2087,9 @@ html[data-signed-in] #accountGate, #accountGate [hidden] { display: none !import
           <p style="font-size:11.5px;">Historical demo rows are marked as sample data; live metrics exclude them.</p>
         </div>
         <div style="display:flex;gap:8px;">
-          <input type="text" id="archiveSearch" placeholder="Search audit name or tag..." style="width:230px;border-radius:var(--radius-pill);padding:6px 14px;">
-          <button class="btn-pill-ghost">Filters</button>
+          <input type="text" id="archiveSearch" placeholder="Search audit name or reviewer..." aria-label="Search audit name or reviewer" style="width:230px;border-radius:var(--radius-pill);padding:6px 14px;">
+          <label style="font-size:11px;color:var(--text-muted)">From <input type="date" id="archiveDateFrom" aria-label="Filter audits from date"></label>
+          <label style="font-size:11px;color:var(--text-muted)">To <input type="date" id="archiveDateTo" aria-label="Filter audits through date"></label>
         </div>
       </div>
 
@@ -2330,7 +2306,8 @@ html[data-signed-in] #accountGate, #accountGate [hidden] { display: none !import
             <label for="defaultAiReview">Optional AI review
               <select id="defaultAiReview"><option value="off">Ask each time</option><option value="on">Include Llama 3.2 in browser by default</option></select>
             </label>
-            <label class="settings-check-row"><input id="saveAuditHistory" type="checkbox" checked> Keep local audit history</label>
+            <label class="settings-check-row"><input id="saveAuditHistory" type="checkbox" checked> Remember unsaved draft in this browser</label>
+            <small style="color:var(--text-muted)">This controls only the draft saved in this browser. Submitted audits are stored in your workspace history.</small>
           </div>
         </section>
 
@@ -2344,18 +2321,34 @@ html[data-signed-in] #accountGate, #accountGate [hidden] { display: none !import
             </select>
           </label>
         </section>
-        <!-- 4 summary tiles exactly as in screenshot 4 -->
+        <!-- Preference summaries are shown only in the section they describe. -->
         <div class="tiles-grid-2" data-settings-grid>
           <div class="white-panel" data-settings-panel="profile" style="padding:16px;">
             <div style="display:flex;justify-content:space-between;align-items:center;">
               <small style="font-size:9.5px;font-weight:700;color:var(--text-dim);text-transform:uppercase;">TARGET WORKSPACE</small>
               <span>⚙</span>
             </div>
-            <div style="font-size:16px;font-weight:800;color:var(--navy);margin:4px 0 8px;">Brand Wise</div>
+            <div style="font-size:16px;font-weight:800;color:var(--navy);margin:4px 0 8px;" id="activeWorkspaceName">Private workspace</div>
             <div style="display:flex;gap:6px;font-size:10px;">
-              <span class="pill-tag pill-gray">ID: BW-2026-HQ</span>
-              <span class="pill-tag pill-blue">Primary Master</span>
+              <span class="pill-tag pill-gray" id="activeWorkspaceRole">Private to you</span>
+              <span class="pill-tag pill-blue" id="activeWorkspaceCount">1 workspace</span>
             </div>
+            <label for="workspaceSwitcher" style="display:block;margin-top:14px;font-weight:700;font-size:11px;">Switch company</label>
+            <select id="workspaceSwitcher" aria-label="Switch company workspace"><option value="">Private workspace</option></select>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+              <input id="newWorkspaceName" placeholder="New company name" aria-label="New company name" style="flex:1;min-width:150px;">
+              <button class="btn-pill-primary" id="createWorkspaceButton" type="button">Create company</button>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+              <input id="workspaceInviteCode" placeholder="Invitation code" aria-label="Company invitation code" style="flex:1;min-width:150px;">
+              <button class="btn-pill-ghost" id="joinWorkspaceButton" type="button">Join company</button>
+            </div>
+            <div id="workspaceInviteAdmin" hidden style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+              <input id="workspaceInviteEmail" type="email" placeholder="Teammate's verified email" aria-label="Invitee verified email" style="flex:1;min-width:150px;">
+              <select id="workspaceInviteRole" aria-label="Company role"><option>Creator</option><option>External Agency</option><option>Reviewer</option><option>Brand Manager</option></select>
+              <button class="btn-pill-ghost" id="createWorkspaceInviteButton" type="button">Create invitation</button>
+            </div>
+            <div id="workspaceInviteStatus" role="status" style="font-size:11px;margin-top:6px;"></div>
           </div>
 
           <div class="white-panel" data-settings-panel="profile" style="padding:16px;">
@@ -2363,10 +2356,10 @@ html[data-signed-in] #accountGate, #accountGate [hidden] { display: none !import
               <small style="font-size:9.5px;font-weight:700;color:var(--text-dim);text-transform:uppercase;">CONNECTED PARTNER</small>
               <span>🏢</span>
             </div>
-            <div style="font-size:16px;font-weight:800;color:var(--navy);margin:4px 0 8px;">Acme Creative</div>
+            <div style="font-size:16px;font-weight:800;color:var(--navy);margin:4px 0 8px;">Workspace membership</div>
             <div style="display:flex;gap:6px;font-size:10px;">
-              <span class="pill-tag pill-gray">Double Pass</span>
-              <span class="pill-tag pill-blue">Unlimited Scans</span>
+              <span class="pill-tag pill-gray">Email-bound invitations</span>
+              <span class="pill-tag pill-blue">Shared company data</span>
             </div>
           </div>
 
@@ -2380,10 +2373,9 @@ html[data-signed-in] #accountGate, #accountGate [hidden] { display: none !import
                 
               </div>
             </div>
-            <div style="font-size:16px;font-weight:800;color:var(--navy);margin:4px 0 8px;">Skybound Ray</div>
+            <div style="font-size:16px;font-weight:800;color:var(--navy);margin:4px 0 8px;">Color theme</div>
             <div style="display:flex;gap:6px;font-size:10px;">
-              <span class="pill-tag pill-gray">Fluid Hierarchy</span>
-              <span class="pill-tag pill-blue">Default Theme</span>
+              <span class="pill-tag pill-gray">Light or dark</span>
             </div>
           </div>
 
@@ -2449,19 +2441,10 @@ html[data-signed-in] #accountGate, #accountGate [hidden] { display: none !import
                   <div style="font-size:10.5px;color:var(--text-dim);">In-app alerts &amp; browser reminders</div>
                 </div>
               </div>
-              <span class="pill-tag pill-orange">8 Active</span>
+              <span class="pill-tag pill-orange" id="activeAlertCount">0 active</span>
             </div>
 
-            <div style="display:flex;flex-direction:column;gap:8px;font-size:11px;margin-top:10px;">
-              <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);">
-                <span>Critical Typographic Drift</span>
-                <span class="pill-tag pill-orange" style="font-size:8.5px;">Local Llama summary</span>
-              </div>
-              <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;">
-                <span>Bi-weekly Synthesis Report</span>
-                <span class="pill-tag pill-blue" style="font-size:8.5px;">All Lead Users</span>
-              </div>
-            </div>
+            <div id="settingsAlertsList" role="status" style="display:flex;flex-direction:column;gap:8px;font-size:11px;margin-top:10px;">No active alerts.</div>
           </div>
 
           <div class="white-panel" data-settings-panel="brand" style="padding:16px;">
@@ -2517,7 +2500,7 @@ html[data-signed-in] #accountGate, #accountGate [hidden] { display: none !import
         <div data-settings-panel="apikeys" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-top:6px;">
           <div style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text-muted);">
             <span style="color:var(--blue-text, var(--blue))">●</span>
-            <span>12 unread notifications detected in audit directory.</span>
+            <span id="settingsNotificationSummary">No unread alerts.</span>
           </div>
           <div style="display:flex;gap:8px;">
             <button class="btn-pill-ghost" id="btnResetSettings" type="button">Reset to Defaults</button>
@@ -2850,6 +2833,9 @@ const $$ = sel => [...document.querySelectorAll(sel)];
 
 let currentAuditRecord = null;
 let currentRole = 'Creator';
+let currentUserRecord = null;
+let activeCompanyRole = null;
+let activeCompanyId = null;
 
 function toast(msg) {
   const t = $('#toast');
@@ -2863,7 +2849,7 @@ function toast(msg) {
 // Navigation & Tab Switching
 // -------------------------------------------------------------------------
 function setTab(tabName) {
-  if (tabName === 'team' && currentRole !== 'Admin') { toast('Administrator access required.'); return; }
+  if (tabName === 'team' && activeCompanyRole !== 'Admin') { toast('Only a company admin can open Team Overview.'); return; }
   $$('.nav-link').forEach(link => {
     link.classList.toggle('active', link.dataset.tab === tabName);
   });
@@ -2875,6 +2861,7 @@ function setTab(tabName) {
   if (tabName === 'team') loadAdminTeam();
   if (tabName === 'history') refreshHistoryMetrics();
   if (tabName === 'history') refreshImpactMetrics();
+  if (tabName === 'settings') loadAlerts();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -2921,10 +2908,32 @@ function saveLocalList(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); return true; }
   catch { toast('Browser storage is full. Remove a large file and try again.'); return false; }
 }
+function rememberUnsavedDraft(forceClear = false) {
+  if (forceClear || !$('#saveAuditHistory')?.checked) {
+    try { localStorage.removeItem(localKey('unsaved-draft')); } catch {}
+    return;
+  }
+  try { localStorage.setItem(localKey('unsaved-draft'), JSON.stringify({content:$('#workspaceInput')?.value || '', title:$('#auditTitleInput')?.value || '', savedAt:Date.now()})); } catch {}
+}
+$('#workspaceInput').addEventListener('input', () => rememberUnsavedDraft());
+$('#auditTitleInput')?.addEventListener('input', () => rememberUnsavedDraft());
+async function saveCompanyCollection(path, value) {
+  try {
+    await accountRequest(path, {items:value});
+    return true;
+  } catch (error) {
+    toast(error.message || 'Could not save shared workspace data.');
+    return false;
+  }
+}
 function dateKey(date) {
   return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
 }
-function loadBrandAssets() { brandAssets = readLocalList(localKey('brand-assets')); renderBrandAssets(); }
+async function loadBrandAssets() {
+  try { const result = await accountRequest('/api/company-data/brand-assets'); brandAssets = Array.isArray(result.items) ? result.items : []; }
+  catch { brandAssets = readLocalList(localKey('brand-assets')); }
+  renderBrandAssets();
+}
 function renderBrandAssets() {
   const grid = $('#brandAssetGrid');
   if (!grid) return;
@@ -2949,9 +2958,9 @@ function renderBrandAssets() {
     const actions = document.createElement('div'); actions.className = 'brand-asset-actions';
     if (asset.data) { const download = document.createElement('a'); download.className = 'btn-pill-ghost'; download.href = asset.data; download.download = asset.name; download.textContent = 'Download'; actions.append(download); }
     const status = document.createElement('button'); status.type = 'button'; status.className = 'btn-pill-ghost'; status.textContent = asset.status === 'Approved' ? 'Mark for review' : 'Approve';
-    status.onclick = () => { asset.status = asset.status === 'Approved' ? 'Needs review' : 'Approved'; saveLocalList(localKey('brand-assets'), brandAssets); renderBrandAssets(); };
+    status.onclick = async () => { asset.status = asset.status === 'Approved' ? 'Needs review' : 'Approved'; if (await saveCompanyCollection('/api/company-data/brand-assets', brandAssets)) renderBrandAssets(); };
     const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'btn-pill-ghost'; remove.textContent = 'Remove';
-    remove.onclick = () => { brandAssets = brandAssets.filter(item => item.id !== asset.id); saveLocalList(localKey('brand-assets'), brandAssets); renderBrandAssets(); };
+    remove.onclick = async () => { const next = brandAssets.filter(item => item.id !== asset.id); if (await saveCompanyCollection('/api/company-data/brand-assets', next)) { brandAssets = next; renderBrandAssets(); } };
     actions.append(status, remove); card.append(preview, title, meta, notes, actions); grid.append(card);
   });
 }
@@ -2963,11 +2972,11 @@ $('#brandAssetFile').onchange = async event => {
   if (file.size > 1.5 * 1024 * 1024) { toast('Choose a file smaller than 1.5 MB.'); event.target.value=''; return; }
   const reader = new FileReader();
   reader.onerror = () => toast('This file could not be read.');
-  reader.onload = () => {
+  reader.onload = async () => {
     const asset = {id:globalThis.crypto?.randomUUID?.() || String(Date.now()), name:file.name, type:file.type, size:file.size,
       category:$('#brandAssetCategory').value, notes:$('#brandAssetNotes').value.trim(), status:'Needs review', data:String(reader.result), addedAt:new Date().toISOString()};
     brandAssets.unshift(asset);
-    if (saveLocalList(localKey('brand-assets'), brandAssets)) { $('#brandAssetNotes').value=''; $('#brandAssetFilter').value='all'; renderBrandAssets(); toast('Brand asset added to your library.'); }
+    if (await saveCompanyCollection('/api/company-data/brand-assets', brandAssets)) { $('#brandAssetNotes').value=''; $('#brandAssetFilter').value='all'; renderBrandAssets(); toast('Brand asset shared with this company workspace.'); }
     else brandAssets.shift();
     event.target.value='';
   };
@@ -2975,14 +2984,77 @@ $('#brandAssetFile').onchange = async event => {
 };
 
 function eventDateTime(item) { return new Date(`${item.date}T${item.time || '00:00'}`); }
-function saveCalendar() { saveLocalList(localKey('calendar-events'), calendarEvents); }
-function loadCalendar() {
-  calendarEvents = readLocalList(localKey('calendar-events'));
+async function saveCalendar() { return saveCompanyCollection('/api/company-data/calendar-events', calendarEvents); }
+async function loadCalendar() {
+  try { const result = await accountRequest('/api/company-data/calendar-events'); calendarEvents = Array.isArray(result.items) ? result.items : []; }
+  catch { calendarEvents = readLocalList(localKey('calendar-events')); }
   calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
   calendarSelectedDate = dateKey(new Date());
   renderCalendar();
   processCalendarNotifications();
 }
+async function loadWorkspaceProfile() {
+  try {
+    const result = await accountRequest('/api/workspaces');
+    const workspaces = result.workspaces || [];
+    activeCompanyId = result.activeCompanyId || null;
+    const active = workspaces.find(item => item.id === activeCompanyId);
+    activeCompanyRole = active?.role || null;
+    $('#activeWorkspaceName').textContent = active?.name || 'Private workspace';
+    $('#activeWorkspaceRole').textContent = activeCompanyRole || 'Private to you';
+    $('#activeWorkspaceCount').textContent = `${workspaces.length || 1} workspace${workspaces.length === 1 ? '' : 's'}`;
+    const select = $('#workspaceSwitcher');
+    select.replaceChildren(new Option('Private workspace', ''));
+    workspaces.forEach(item => select.add(new Option(`${item.name} · ${item.role}`, item.id)));
+    select.value = activeCompanyId || '';
+    select.disabled = workspaces.length === 0;
+    $('#workspaceInviteAdmin').hidden = activeCompanyRole !== 'Admin';
+    $('#adminTeamNav').hidden = activeCompanyRole !== 'Admin';
+  } catch (error) { $('#workspaceInviteStatus').textContent = error.message; }
+}
+async function loadAlerts() {
+  const list = $('#settingsAlertsList');
+  if (!list) return;
+  try {
+    const result = await accountRequest('/api/alerts');
+    const alerts = Array.isArray(result.alerts) ? result.alerts : [];
+    $('#activeAlertCount').textContent = `${alerts.length} active`;
+    list.replaceChildren();
+    if (!alerts.length) { list.textContent = 'No active review alerts for this company.'; return; }
+    alerts.forEach(alert => {
+      const item = document.createElement('button'); item.type = 'button'; item.className = 'btn-pill-ghost';
+      item.style.cssText = 'text-align:left;white-space:normal';
+      item.textContent = `${alert.title || 'Untitled audit'} · ${alert.status || 'Review needed'}`;
+      item.onclick = () => openAuditRecord(alert.id);
+      list.append(item);
+    });
+  } catch (error) {
+    $('#activeAlertCount').textContent = 'Unavailable';
+    list.textContent = error.message || 'Could not load company alerts.';
+  }
+}
+$('#createWorkspaceButton').onclick = async () => {
+  const name = $('#newWorkspaceName').value.trim();
+  try { await accountRequest('/api/workspaces', {name}); location.reload(); }
+  catch (error) { toast(error.message); }
+};
+$('#workspaceSwitcher').onchange = async event => {
+  const companyId = event.target.value;
+  if (!companyId || companyId === activeCompanyId) return;
+  try { await accountRequest('/api/workspaces/switch', {companyId}); location.reload(); }
+  catch (error) { toast(error.message); }
+};
+$('#joinWorkspaceButton').onclick = async () => {
+  try { await accountRequest('/api/workspaces/join', {code:$('#workspaceInviteCode').value.trim()}); location.reload(); }
+  catch (error) { toast(error.message); }
+};
+$('#createWorkspaceInviteButton').onclick = async () => {
+  const status = $('#workspaceInviteStatus');
+  try {
+    const result = await accountRequest('/api/workspaces/invite', {email:$('#workspaceInviteEmail').value.trim(), role:$('#workspaceInviteRole').value});
+    status.textContent = `Invitation code ${result.code} is bound to ${result.email}; share it with that teammate.`;
+  } catch (error) { status.textContent = error.message; }
+};
 function renderCalendar() {
   if (!$('#calendarDays')) return;
   const year = calendarMonth.getFullYear(), month = calendarMonth.getMonth();
@@ -3018,7 +3090,7 @@ function renderCalendarUpcoming() {
     const detail=document.createElement('div'); const title=document.createElement('div'); title.className='calendar-event-title'; title.textContent=item.title;
     const meta=document.createElement('div'); meta.className='calendar-event-detail'; meta.textContent=`${item.type}${item.notes ? ` · ${item.notes}`:''}${item.notify ? ' · Reminder on':''}`; detail.append(title,meta);
     const remove=document.createElement('button'); remove.type='button'; remove.className='btn-pill-ghost'; remove.textContent='Remove';
-    remove.onclick=()=>{calendarEvents=calendarEvents.filter(entry=>entry.id!==item.id);saveCalendar();renderCalendar();};
+    remove.onclick=async()=>{const previous=calendarEvents;calendarEvents=calendarEvents.filter(entry=>entry.id!==item.id);if(await saveCalendar())renderCalendar();else calendarEvents=previous;};
     row.append(date,detail,remove); list.append(row);
   });
 }
@@ -3040,10 +3112,12 @@ $('#calendarEventForm').onsubmit=async event=>{
     date:$('#calendarEventDate').value,time:$('#calendarEventTime').value,notes:$('#calendarEventNotes').value.trim(),notify,notified:false};
   if (!item.title || !item.date || !item.time) return;
   if (eventDateTime(item).getTime()<Date.now()) { $('#calendarFormStatus').textContent='Choose a future date and time.'; return; }
-  calendarEvents.push(item); saveCalendar(); calendarSelectedDate=item.date; calendarMonth=new Date(`${item.date}T12:00:00`); renderCalendar();
+  calendarEvents.push(item);
+  if (!await saveCalendar()) { calendarEvents.pop(); $('#calendarFormStatus').textContent='Could not save the reminder. Your calendar was not changed.'; return; }
+  calendarSelectedDate=item.date; calendarMonth=new Date(`${item.date}T12:00:00`); renderCalendar();
   $('#calendarEventForm').reset(); $('#calendarEventNotify').checked=true; $('#calendarEventDate').value=dateKey(new Date());
   const next=new Date(Date.now()+3600000); $('#calendarEventTime').value=`${String(next.getHours()).padStart(2,'0')}:${String(next.getMinutes()).padStart(2,'0')}`;
-  $('#calendarFormStatus').textContent='Reminder saved.'; setTimeout(()=>$('#calendarFormStatus').textContent='',3000);
+  $('#calendarFormStatus').textContent='Reminder saved to the shared company calendar.'; setTimeout(()=>$('#calendarFormStatus').textContent='',3000);
 };
 function processCalendarNotifications() {
   const now=Date.now(); let changed=false;
@@ -3062,7 +3136,7 @@ $('#calendarEventTime').value=`${String(initialReminderTime.getHours()).padStart
 setInterval(processCalendarNotifications,15000);
 async function loadAdminTeam() {
   const status=$('#adminTeamStatus'), rows=$('#adminTeamRows');
-  if (!status || currentRole !== 'Admin') return;
+  if (!status || activeCompanyRole !== 'Admin') return;
   status.textContent='Loading team profiles and recent audit activity…';
   try {
     const [team, auditResult]=await Promise.all([accountRequest('/api/admin/team'), api('/api/audits')]);
@@ -3098,13 +3172,9 @@ async function loadAdminTeam() {
 }
 $('#refreshAdminTeam').onclick=loadAdminTeam;
 
-$('#btnTopQuickScan').onclick = () => {
-  setTab('workspace');
-  $('#workspaceInput').focus();
-};
 $('#btnHistoryAuditNow').onclick = () => {
   setTab('workspace');
-  $('#workspaceInput').focus();
+  startNewAudit();
 };
 $('#btnConfigureWebhooks').onclick = () => {
   setTab('settings');
@@ -3305,9 +3375,12 @@ async function refreshHistoryMetrics() {
     const sample = item.sampleData ? ' · SAMPLE' : '';
     const issueCount = (item.findings || []).length;
     const score = Number.isFinite(Number(item.score)) ? `${Number(item.score)}%` : '—';
-    return `<tr data-audit-id="${escapeHTML(item.id || '')}"><td><div style="font-weight:700;color:var(--navy);">${escapeHTML(item.title || 'Untitled audit')}</div><div style="font-size:10.5px;color:var(--text-dim);">${escapeHTML(item.channel || item.type || 'Audit')}${sample}</div></td><td>${escapeHTML(item.settings?.strictness || 'Deterministic')}</td><td>${item.date ? escapeHTML(new Date(item.date).toLocaleString()) : '—'}</td><td><b>${score}</b></td><td>${issueCount}</td><td>${escapeHTML(item.status || '—')}</td><td><button class="btn-pill-ghost btn-view-audit-report" data-audit-id="${escapeHTML(item.id || '')}" type="button">View Report</button></td></tr>`;
+    const auditDate = item.date ? new Date(item.date).toISOString().slice(0,10) : '';
+    const reviewer = item.reviewedBy || item.reviewer || item.approvedBy || '';
+    return `<tr data-audit-id="${escapeHTML(item.id || '')}" data-audit-date="${escapeHTML(auditDate)}"><td><div style="font-weight:700;color:var(--navy);">${escapeHTML(item.title || 'Untitled audit')}</div><div style="font-size:10.5px;color:var(--text-dim);">${escapeHTML(item.channel || item.type || 'Audit')}${sample} · ${escapeHTML(item.creator || 'Unknown submitter')}${reviewer ? ` · Reviewer: ${escapeHTML(reviewer)}` : ''}</div></td><td>${escapeHTML(item.settings?.strictness || 'Deterministic')}</td><td>${item.date ? escapeHTML(new Date(item.date).toLocaleString()) : '—'}</td><td><b>${score}</b></td><td>${issueCount}</td><td>${escapeHTML(item.status || '—')}</td><td><button class="btn-pill-ghost btn-view-audit-report" data-audit-id="${escapeHTML(item.id || '')}" type="button">View Report</button></td></tr>`;
   }).join('') || '<tr><td colspan="7">No saved audits yet.</td></tr>';
   $$('.btn-view-audit-report[data-audit-id]').forEach(button => button.onclick = () => openAuditRecord(button.dataset.auditId));
+  filterAuditArchive();
 }
 
 async function refreshGuidelineCounts() {
@@ -3380,57 +3453,64 @@ $('#btnAuditContent').onclick = async () => {
   const btn = $('#btnAuditContent');
   btn.disabled = true;
   btn.innerHTML = `AUDITING...`;
-  await flushAndRefreshAuditPreferences();
-  const auditPreferences = readAuditPreferences();
   const requestStarted = performance.now();
-  const aiEnabled = document.querySelector('#enableGemini')?.checked ?? (document.getElementById('defaultAiReview')?.value === 'on');
-  const selectedAi = document.querySelector('#aiReviewProvider')?.value || 'browser-1b';
-  let aiProvider = null;
-  let clientAi = null;
   let aiFallbackReason = '';
-  if (aiEnabled && selectedAi.startsWith('browser-')) {
-    try {
-      const context = await getAiContext();
-      const model = selectedAi === 'browser-3b' ? AI_MODELS.llama3b : AI_MODELS.llama1b;
-      const actualModel = await ensureBrowserModel(model);
-      const findings = await runBrowserAiReview(content, context, actualModel);
-      aiProvider = 'browser';
-      clientAi = {model: actualModel, findings};
-      updateAiStatus('Model ready. Reviewing draft privately in this browser…', 'pending');
-    } catch (error) {
-      aiFallbackReason = friendlyAiError(error);
-      updateAiStatus(`${aiFallbackReason} Deterministic checks will continue.`, 'error');
+  try {
+    await flushAndRefreshAuditPreferences();
+    const auditPreferences = readAuditPreferences();
+    const aiEnabled = document.querySelector('#enableGemini')?.checked ?? (document.getElementById('defaultAiReview')?.value === 'on');
+    const selectedAi = document.querySelector('#aiReviewProvider')?.value || 'browser-1b';
+    let aiProvider = null;
+    let clientAi = null;
+    if (aiEnabled && selectedAi.startsWith('browser-')) {
+      const requested = selectedAi === 'browser-3b' ? AI_MODELS.llama3b : AI_MODELS.llama1b;
+      if (browserAiEngine && browserAiModel && (browserAiModel.startsWith(selectedAi === 'browser-3b' ? 'Llama-3.2-3B' : 'Llama-3.2-1B'))) {
+        try {
+          const context = await getAiContext();
+          const findings = await runBrowserAiReview(content, context, browserAiModel);
+          aiProvider = 'browser';
+          clientAi = {model: browserAiModel, findings};
+        } catch (error) {
+          aiFallbackReason = friendlyAiError(error);
+        }
+      } else {
+        aiFallbackReason = 'The in-browser model is still downloading; this audit is running with deterministic checks now.';
+        if (!browserAiLoadPromise) getOrLoadBrowserModel(requested).catch(() => {});
+      }
+    } else if (aiEnabled && selectedAi === 'gemini') {
+      aiProvider = 'gemini';
     }
-  } else if (aiEnabled && selectedAi === 'gemini') {
-    aiProvider = 'gemini';
-  }
 
-  const res = await api('/api/audits', {
-    method: 'POST',
-    body: JSON.stringify({
-      content,
-      channel: document.getElementById('defaultChannel')?.value || 'Website Copy',
-      role: currentRole,
-      settings: auditPreferences,
-      useAI: Boolean(aiProvider),
-      aiProvider,
-      clientAi
-    })
-  });
-
-  btn.disabled = false;
-  btn.innerHTML = `<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> AUDIT CONTENT ➔`;
-
-  if (res) {
-    res.clientRoundTripMs = Math.round(performance.now() - requestStarted);
-    currentAuditRecord = res;
-    renderAuditReport(res);
-    refreshHistoryMetrics();
-    toast(`Audit complete: Score ${res.score}%`);
-    if (aiFallbackReason) updateAiStatus(`${aiFallbackReason} Deterministic checks were completed.`, 'error');
-    else updateAiStatus(res.aiStatus || 'Deterministic review', res.aiStatus?.includes('unavailable') ? 'error' : 'success');
-  } else {
-    toast('The audit could not be saved. Please try again.');
+    const res = await api('/api/audits', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: document.getElementById('auditTitleInput')?.value.trim() || '',
+        content,
+        channel: document.getElementById('defaultChannel')?.value || 'Website Copy',
+        role: currentRole,
+        settings: auditPreferences,
+        useAI: Boolean(aiProvider),
+        aiProvider,
+        clientAi
+      })
+    });
+    if (res) {
+      res.clientRoundTripMs = Math.round(performance.now() - requestStarted);
+      currentAuditRecord = res;
+      renderAuditReport(res);
+      refreshHistoryMetrics();
+      toast(`Audit complete: Score ${res.score}%`);
+      if (aiFallbackReason) updateAiStatus(`${aiFallbackReason} Deterministic checks were completed.`, 'error');
+      else updateAiStatus(res.aiStatus || 'Deterministic review', res.aiStatus?.includes('unavailable') ? 'error' : 'success');
+      rememberUnsavedDraft(false);
+    } else {
+      toast('The audit could not be saved. Your draft remains in the editor; retry the check.');
+    }
+  } catch (error) {
+    toast(error?.message || 'The audit could not be completed. Your draft remains in the editor.');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> AUDIT CONTENT ➔`;
   }
 };
 
@@ -3605,6 +3685,8 @@ async function openAuditRecord(auditId) {
   const record = await api(`/api/audits/${encodeURIComponent(auditId)}`);
   if (!record) { toast('Could not load this audit record.'); return; }
   currentAuditRecord = record;
+  $('#workspaceInput').value = record.content || '';
+  if ($('#auditTitleInput')) $('#auditTitleInput').value = record.title || '';
   renderAuditReport(record);
   setTab('workspace');
 }
@@ -3616,25 +3698,64 @@ async function saveFindingAction(action) {
   }
   const saved = await api(`/api/audits/${currentAuditRecord.id}/action`, {
     method: 'POST',
-    body: JSON.stringify(action)
+    body: JSON.stringify({...action, baseRevisionId: currentAuditRecord.currentRevisionId})
   });
   if (saved) {
     currentAuditRecord = saved;
     renderAuditReport(saved);
   } else {
-    toast('Could not save this action. Please try again.');
+    const latest = await api(`/api/audits/${encodeURIComponent(currentAuditRecord.id)}`);
+    toast(latest && latest.currentRevisionId !== currentAuditRecord.currentRevisionId
+      ? 'This audit changed since you opened it. Your editor text is unchanged; reopen the saved revision and retry.'
+      : 'Could not save this action. Please try again.');
   }
   return saved;
 }
 
 async function saveFindingFix(finding, action, wording) {
   if (!finding?.id || !wording?.trim()) return;
-  const saved = await saveFindingAction({ action, findingId: finding.id, fixText: wording.trim() });
+  const phrase = String(finding.wrong || '');
+  const source = String(currentAuditRecord?.content || '');
+  const matches = [];
+  if (phrase) for (let offset = 0, found; (found = source.toLowerCase().indexOf(phrase.toLowerCase(), offset)) !== -1; offset = found + phrase.length) matches.push(found);
+  let occurrenceIndex = 0;
+  if (matches.length > 1) {
+    const choice = window.prompt(`This wording appears ${matches.length} times. Enter the occurrence number to replace (1–${matches.length}):`, String(matches.length));
+    if (choice === null) return;
+    occurrenceIndex = Number(choice) - 1;
+    if (!Number.isInteger(occurrenceIndex) || occurrenceIndex < 0 || occurrenceIndex >= matches.length) { toast('Choose a valid occurrence number.'); return; }
+  }
+  const saved = await saveFindingAction({ action, findingId: finding.id, fixText: wording.trim(), occurrenceIndex });
   if (saved) {
     $('#workspaceInput').value = saved.content || $('#workspaceInput').value;
     toast(action === 'edit_fix' ? 'Edited wording and saved it to the audit trail' : 'Fix accepted and saved to the audit trail');
   }
 }
+
+function startNewAudit() {
+  const hasUnsavedText = Boolean($('#workspaceInput').value.trim()) &&
+    (!currentAuditRecord || $('#workspaceInput').value !== (currentAuditRecord.content || ''));
+  if (hasUnsavedText && !confirm('Discard the current unsaved draft and start a new audit?')) return;
+  $('#workspaceInput').value = '';
+  $('#auditTitleInput').value = '';
+  $('#draftImportStatus').textContent = 'Paste or import a draft to begin. Imported text is shown here before checks.';
+  currentAuditRecord = null;
+  rememberUnsavedDraft(true);
+  $('#reportConfidenceVal').textContent = '—';
+  $('#reportComplianceVal').textContent = 'No audit results yet';
+  $('#reportHeaderBadge').textContent = 'NO RESULTS';
+  $('#reportHeaderBadge').className = 'pill-tag pill-gray';
+  $('#lifecycleBadge').textContent = 'Not started';
+  $('#lifecycleBadge').className = 'pill-tag pill-gray';
+  $('#findingsContainer').textContent = 'Run an audit to see verified findings and evidence.';
+  $('#reportSuggestionBox').style.display = 'none';
+  $('#reportSuggestionBox').replaceChildren();
+  ['btnReqChanges','btnApproveDraft','btnPublishDraft'].forEach(id => { const button=$(`#${id}`); if(button)button.disabled=true; });
+  ['bar1Label','bar2Label','bar3Label'].forEach(id => { const node=$(`#${id}`); if(node)node.textContent='0 findings'; });
+  ['bar1Fill','bar2Fill','bar3Fill'].forEach(id => { const node=$(`#${id}`); if(node)node.style.width='0%'; });
+  $('#workspaceInput').focus();
+}
+$('#btnNewAudit').onclick = startNewAudit;
 
 // -------------------------------------------------------------------------
 // Governance Lifecycle Actions (Approve, Request Changes, Publish)
@@ -3746,19 +3867,48 @@ function bindArchiveRowButtons() {
 bindArchiveRowButtons();
 
 // Archive Search Filter
-$('#archiveSearch').oninput = (e) => {
-  const q = e.target.value.toLowerCase().trim();
-  $$('#historyTableRows tr').forEach(row => {
-    const txt = row.textContent.toLowerCase();
-    row.style.display = txt.includes(q) ? '' : 'none';
+function filterAuditArchive() {
+  const q = $('#archiveSearch').value.toLowerCase().trim();
+  const from = $('#archiveDateFrom').value;
+  const to = $('#archiveDateTo').value;
+  $$('#historyTableRows tr[data-audit-id]').forEach(row => {
+    const date = row.dataset.auditDate || '';
+    const matchesText = row.textContent.toLowerCase().includes(q);
+    const matchesDate = (!from || (date && date >= from)) && (!to || (date && date <= to));
+    row.style.display = matchesText && matchesDate ? '' : 'none';
   });
-};
+}
+$('#archiveSearch').oninput = filterAuditArchive;
+$('#archiveDateFrom').onchange = filterAuditArchive;
+$('#archiveDateTo').onchange = filterAuditArchive;
 
 // -------------------------------------------------------------------------
 // File Drop Zone Ingestion (PDF Stage 1)
 // -------------------------------------------------------------------------
 const dropZone = $('#dropDocZone');
 const fileInput = $('#fileDocUpload');
+const auditDraftFile = $('#auditDraftFile');
+$('#importAuditDraftButton').onclick = () => auditDraftFile.click();
+auditDraftFile.onchange = async () => {
+  const file = auditDraftFile.files?.[0];
+  if (!file) return;
+  const status = $('#draftImportStatus');
+  if (file.size > 10 * 1024 * 1024) { status.textContent = 'This file is over 10 MB. Try a smaller file. Scanned PDFs need OCR, which is not supported yet.'; auditDraftFile.value=''; return; }
+  status.textContent = 'Extracting text…';
+  try {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    let binary = ''; for (let i=0;i<bytes.length;i+=8192) binary += String.fromCharCode(...bytes.subarray(i,i+8192));
+    const response = await fetch('/api/import', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:file.name,data:btoa(binary)})});
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Could not extract this document.');
+    if (!result.text?.trim()) throw new Error('No readable text was found. This may be a scanned PDF; OCR is not supported yet.');
+    $('#workspaceInput').value = result.text.slice(0,250000);
+    $('#auditTitleInput').value = $('#auditTitleInput').value.trim() || file.name.replace(/\.[^.]+$/,'').slice(0,150);
+    $('#workspaceInput').dispatchEvent(new Event('input', {bubbles:true}));
+    status.textContent = `Extracted ${Math.min(result.text.length,250000).toLocaleString()} characters from ${file.name}. Review the draft before auditing.`;
+  } catch (error) { status.textContent = error.message || 'Document extraction failed. Your current draft was preserved.'; }
+  finally { auditDraftFile.value=''; }
+};
 
 $('#btnSelectFileDoc').onclick = (e) => {
   e.stopPropagation();
@@ -4126,8 +4276,18 @@ $('#btnSaveSettings').onclick = async () => {
   loadKeys();
 };
 
-$('#btnResetSettings').onclick = () => {
-  toast('Settings restored to defaults');
+$('#btnResetSettings').onclick = async () => {
+  const defaults = {strictness:'balanced', passingThreshold:80};
+  try { localStorage.setItem('brandwise-audit-preferences', JSON.stringify(defaults)); } catch {}
+  applyAuditPreferences(defaults);
+  $('#defaultChannel').value = 'Website Copy';
+  $('#defaultAiReview').value = 'off';
+  $('#saveAuditHistory').checked = true;
+  generalPrefs.forEach(id => { try { localStorage.setItem(`brandwise-pref-${id}`, JSON.stringify(id === 'defaultChannel' ? 'Website Copy' : id === 'saveAuditHistory')); } catch {} });
+  if (themePreference) { themePreference.value='light'; themePreference.dispatchEvent(new Event('change')); }
+  rememberUnsavedDraft();
+  const saved = await saveAuditPreferencesNow(defaults);
+  toast(saved ? 'Workspace preferences reset to defaults.' : 'Local preferences reset. Shared audit defaults could not be saved.');
 };
 
 function escapeHTML(str) {
@@ -4218,6 +4378,27 @@ const emailOtpCode = $('#emailOtpCode');
 const emailVerificationStatus = $('#emailVerificationStatus');
 const sendEmailOtpButton = $('#sendEmailOtp');
 const confirmEmailOtpButton = $('#confirmEmailOtp');
+let firebaseAuthPromise;
+async function getFirebaseAuth() {
+  if (!firebaseAuthPromise) firebaseAuthPromise = (async () => {
+    const [appSdk, authSdk] = await Promise.all([
+      import('https://www.gstatic.com/firebasejs/13.4.0/firebase-app.js'),
+      import('https://www.gstatic.com/firebasejs/13.4.0/firebase-auth.js')
+    ]);
+    const app = appSdk.initializeApp({
+      apiKey: 'AIzaSyB5ZWrXltQKygEcdeED10Q9vkIpdQn8CMk',
+      authDomain: 'brand-wise-7318f.firebaseapp.com',
+      projectId: 'brand-wise-7318f',
+      storageBucket: 'brand-wise-7318f.firebasestorage.app',
+      messagingSenderId: '292107787914',
+      appId: '1:292107787914:web:db02ea63a6095987239773',
+      measurementId: 'G-BCXJCF9Z0K'
+    });
+    return {auth:authSdk.getAuth(app), ...authSdk};
+  })();
+  return firebaseAuthPromise;
+}
+let firebaseVerifiedToken = '';
 async function accountRequest(path, data) {
   const response = await fetch(path, data === undefined ? {} : {
     method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
@@ -4238,9 +4419,7 @@ async function accountRequest(path, data) {
 function resetEmailVerification() {
   verifiedEmail = '';
   emailOtpPanel.hidden = true;
-  emailOtpCode.value = '';
-  emailOtpCode.disabled = true;
-  confirmEmailOtpButton.disabled = true;
+  firebaseVerifiedToken = '';
   sendEmailOtpButton.disabled = false;
   sendEmailOtpButton.textContent = 'Verify';
   emailVerificationStatus.textContent = '';
@@ -4249,49 +4428,64 @@ function resetEmailVerification() {
 registrationEmail.addEventListener('input', () => {
   if (verifiedEmail && registrationEmail.value.trim().toLowerCase() !== verifiedEmail) resetEmailVerification();
 });
-emailOtpCode.addEventListener('input', () => {
-  confirmEmailOtpButton.disabled = !/^\d{6}$/.test(emailOtpCode.value.trim());
-});
 sendEmailOtpButton.onclick = async () => {
   if (!registrationEmail.reportValidity()) return;
   const email = registrationEmail.value.trim().toLowerCase();
   sendEmailOtpButton.disabled = true;
-  emailVerificationStatus.textContent = 'Sending a verification code…';
+  emailVerificationStatus.textContent = 'Creating your secure account and sending a verification link…';
   emailVerificationStatus.dataset.state = 'pending';
   try {
-    const res = await accountRequest('/api/auth/send-otp', { email });
+    const {auth, createUserWithEmailAndPassword, sendEmailVerification} = await getFirebaseAuth();
+    const credential = await createUserWithEmailAndPassword(auth, email, accountForm.elements.password.value);
+    await sendEmailVerification(credential.user);
     if (registrationEmail.value.trim().toLowerCase() !== email) {
       emailVerificationStatus.textContent = 'The email changed. Verify the current address.';
       emailVerificationStatus.dataset.state = 'error';
       return;
     }
     emailOtpPanel.hidden = false;
-    emailOtpCode.disabled = false;
-    sendEmailOtpButton.textContent = 'Resend code';
-    if (res && res.dev_code) {
-      emailOtpCode.value = res.dev_code;
-      confirmEmailOtpButton.disabled = false;
-      emailVerificationStatus.textContent = `Local mode: code is ${res.dev_code} (auto-filled). Click Confirm Code to verify.`;
-      confirmEmailOtpButton.focus();
-    } else {
-      confirmEmailOtpButton.disabled = true;
-      emailVerificationStatus.textContent = `A 6-digit code was sent to ${email}. It expires in 10 minutes.`;
-      emailOtpCode.focus();
-    }
+    sendEmailOtpButton.textContent = 'Resend link';
+    emailVerificationStatus.textContent = `Verification link sent to ${email}. Verify there, return here, then click “I verified my email”.`;
     emailVerificationStatus.dataset.state = 'success';
   } catch (error) {
-    emailVerificationStatus.textContent = error.message;
-    emailVerificationStatus.dataset.state = 'error';
+    if (error.code === 'auth/email-already-in-use') {
+      try {
+        const {auth, signInWithEmailAndPassword, sendEmailVerification} = await getFirebaseAuth();
+        const existing = await signInWithEmailAndPassword(auth, email, accountForm.elements.password.value);
+        if (existing.user.emailVerified) {
+          firebaseVerifiedToken = await existing.user.getIdToken(true);
+          verifiedEmail = email;
+          sendEmailOtpButton.textContent = 'Verified ✓';
+          sendEmailOtpButton.disabled = true;
+          emailVerificationStatus.textContent = 'Email already verified. You can finish creating your BrandWise profile.';
+          emailVerificationStatus.dataset.state = 'success';
+          return;
+        }
+        await sendEmailVerification(existing.user);
+        emailOtpPanel.hidden = false;
+        emailVerificationStatus.textContent = 'A new verification link was sent. Follow it, return here, and confirm.';
+      } catch (resumeError) {
+        emailVerificationStatus.textContent = resumeError.code === 'auth/invalid-credential'
+          ? 'That Firebase email already exists. Sign in with its password or reset it first.' : resumeError.message;
+      }
+    } else {
+      emailVerificationStatus.textContent = error.code === 'auth/weak-password' ? 'Use a password with at least 15 characters.' : error.message;
+    }
+    if (verifiedEmail !== email) emailVerificationStatus.dataset.state = 'error';
   } finally {
-    sendEmailOtpButton.disabled = false;
+    sendEmailOtpButton.disabled = verifiedEmail === email;
   }
 };
 confirmEmailOtpButton.onclick = async () => {
   const email = registrationEmail.value.trim().toLowerCase();
-  const code = emailOtpCode.value.trim();
   confirmEmailOtpButton.disabled = true;
   try {
-    await accountRequest('/api/auth/verify-otp', { email, code });
+    const {auth, reload, getIdToken} = await getFirebaseAuth();
+    const user = auth.currentUser;
+    if (!user || user.email.toLowerCase() !== email) throw new Error('Sign in to the same Firebase email address that received the verification link.');
+    await reload(user);
+    if (!user.emailVerified) throw new Error('Firebase still shows this email as unverified. Open the latest verification email link and try again.');
+    firebaseVerifiedToken = await getIdToken(user, true);
     verifiedEmail = email;
     emailVerificationStatus.textContent = 'Email verified. You can finish creating your account.';
     emailVerificationStatus.dataset.state = 'success';
@@ -4300,7 +4494,7 @@ confirmEmailOtpButton.onclick = async () => {
   } catch (error) {
     emailVerificationStatus.textContent = error.message;
     emailVerificationStatus.dataset.state = 'error';
-    confirmEmailOtpButton.disabled = !/^\d{6}$/.test(emailOtpCode.value.trim());
+    confirmEmailOtpButton.disabled = false;
   }
 };
 function updateRegistrationQuestions() {
@@ -4320,7 +4514,7 @@ function setRegistration(enabled) {
     field.required = enabled;
   });
   accountForm.elements.password.autocomplete = enabled ? 'new-password' : 'current-password';
-  accountForm.elements.password.minLength = enabled ? 4 : 0;
+  accountForm.elements.password.minLength = enabled ? 15 : 0;
   resetEmailVerification();
   $('#accountTitle').textContent = enabled ? 'Create an account' : 'Sign in';
   $('#accountSubmit').textContent = enabled ? 'Register' : 'Sign in';
@@ -4337,7 +4531,6 @@ $('#forgotPasswordButton').onclick = () => {
   accountForm.hidden = true;
   forgotPasswordForm.hidden = false;
   forgotPasswordForm.reset();
-  $('#passwordResetFields').hidden = true;
   passwordResetStatus.textContent = '';
   passwordResetStatus.removeAttribute('data-state');
   $('#accountTitle').textContent = 'Reset password';
@@ -4354,19 +4547,12 @@ $('#sendPasswordResetCode').onclick = async () => {
   if (!passwordResetEmail.reportValidity()) return;
   const button = $('#sendPasswordResetCode');
   button.disabled = true;
-  passwordResetStatus.textContent = 'Sending a reset code…';
+  passwordResetStatus.textContent = 'Sending a secure password reset link…';
   passwordResetStatus.dataset.state = 'pending';
   try {
-    const result = await accountRequest('/api/auth/password-reset/send', {email:passwordResetEmail.value.trim().toLowerCase()});
-    $('#passwordResetFields').hidden = false;
-    if (result && result.dev_code) {
-      $('#passwordResetCode').value = result.dev_code;
-      passwordResetStatus.textContent = `Local mode: reset code is ${result.dev_code} (auto-filled).`;
-      $('#passwordResetNewPassword').focus();
-    } else {
-      passwordResetStatus.textContent = result.message || 'If an account uses that email, a reset code has been sent.';
-      $('#passwordResetCode').focus();
-    }
+    const {auth, sendPasswordResetEmail} = await getFirebaseAuth();
+    await sendPasswordResetEmail(auth, passwordResetEmail.value.trim().toLowerCase());
+    passwordResetStatus.textContent = 'If an account uses that email, Firebase sent a password reset link. Follow it, then return and sign in with your new password.';
     passwordResetStatus.dataset.state = 'success';
   } catch (error) {
     passwordResetStatus.textContent = error.message;
@@ -4375,37 +4561,6 @@ $('#sendPasswordResetCode').onclick = async () => {
 };
 forgotPasswordForm.onsubmit = async event => {
   event.preventDefault();
-  const submit = $('#submitPasswordReset');
-  const code = $('#passwordResetCode').value.trim();
-  const password = $('#passwordResetNewPassword').value;
-  const confirmation = $('#passwordResetConfirmPassword').value;
-  if (!/^\d{6}$/.test(code)) {
-    passwordResetStatus.textContent = 'Enter the six-digit code from your email.';
-    passwordResetStatus.dataset.state = 'error';
-    return;
-  }
-  if (password !== confirmation) {
-    passwordResetStatus.textContent = 'The new passwords do not match.';
-    passwordResetStatus.dataset.state = 'error';
-    return;
-  }
-  submit.disabled = true;
-  passwordResetStatus.textContent = 'Updating your password…';
-  passwordResetStatus.dataset.state = 'pending';
-  try {
-    await accountRequest('/api/auth/password-reset', {email:passwordResetEmail.value.trim().toLowerCase(), code, newPassword:password});
-    forgotPasswordForm.reset();
-    $('#passwordResetFields').hidden = true;
-    forgotPasswordForm.hidden = true;
-    accountForm.hidden = false;
-    setRegistration(false);
-    $('#accountTitle').textContent = 'Sign in';
-    accountError.textContent = 'Password updated. Sign in with your username and new password.';
-    accountForm.elements.username.focus();
-  } catch (error) {
-    passwordResetStatus.textContent = error.message;
-    passwordResetStatus.dataset.state = 'error';
-  } finally { submit.disabled = false; }
 };
 $('#accountMode').onclick = async () => {
   if (registration) return setRegistration(false);
@@ -4425,13 +4580,35 @@ accountForm.onsubmit = async event => {
     if (registration && verifiedEmail !== String(formData.email || '').trim().toLowerCase()) {
       throw new Error('Verify your email address before creating an account.');
     }
-    await accountRequest(registration ? '/api/auth/register' : '/api/auth/login', formData);
     if (registration) {
+      if (!firebaseVerifiedToken) throw new Error('Verify your email from the Firebase message first.');
+      await accountRequest('/api/auth/firebase/register', {...formData, idToken:firebaseVerifiedToken});
       setRegistration(false);
       accountForm.elements.password.value = '';
-      accountError.textContent = 'Account created. Sign in with your username and password.';
-      accountForm.elements.password.focus();
+      await initializeAccount();
     } else {
+      const identifier = String(formData.username || '').trim();
+      if (identifier.toUpperCase() === 'ADMIN') {
+        await accountRequest('/api/auth/login', formData);
+      } else {
+        const {auth, signInWithEmailAndPassword, getIdToken, reload} = await getFirebaseAuth();
+        let email = identifier;
+        if (!identifier.includes('@')) {
+          const result = await accountRequest('/api/auth/resolve-login', {username:identifier});
+          if (!result.email) throw new Error('Username or email is incorrect.');
+          email = result.email;
+        }
+        try {
+          const credential = await signInWithEmailAndPassword(auth, email, formData.password);
+          await reload(credential.user);
+          if (!credential.user.emailVerified) throw new Error('Verify your email from the Firebase message before signing in.');
+          await accountRequest('/api/auth/firebase/session', {idToken:await getIdToken(credential.user, true)});
+        } catch (firebaseError) {
+          if (['auth/user-not-found','auth/invalid-credential','auth/operation-not-allowed'].includes(firebaseError.code)) {
+            await accountRequest('/api/auth/login', formData);
+          } else throw firebaseError;
+        }
+      }
       await initializeAccount();
     }
   } catch (error) {
@@ -4596,7 +4773,14 @@ profileChangePasswordForm.onsubmit = async event => {
   button.disabled = true;
   profilePasswordStatus.textContent = 'Updating password…';
   try {
-    await accountRequest('/api/auth/change-password', {currentPassword, newPassword});
+    const {auth, EmailAuthProvider, reauthenticateWithCredential, updatePassword} = await getFirebaseAuth();
+    if (auth.currentUser) {
+      const credential = EmailAuthProvider.credential(auth.currentUser.email, currentPassword);
+      await reauthenticateWithCredential(auth.currentUser, credential);
+      await updatePassword(auth.currentUser, newPassword);
+    } else {
+      await accountRequest('/api/auth/change-password', {currentPassword, newPassword});
+    }
     profileChangePasswordForm.reset();
     profilePasswordStatus.textContent = 'Password changed successfully.';
   } catch (error) {
@@ -4608,7 +4792,6 @@ const profilePasswordResetForm = $('#profilePasswordResetForm');
 const profilePasswordResetStatus = $('#profilePasswordResetStatus');
 $('#profileForgotPassword').onclick = () => {
   $('#profileResetEmail').value = $('#editProfileEmail').value.trim();
-  $('#profileResetFields').hidden = true;
   profilePasswordResetStatus.textContent = '';
   profileChangePasswordForm.hidden = true;
   profilePasswordResetForm.hidden = false;
@@ -4624,33 +4807,17 @@ $('#profileSendResetCode').onclick = async () => {
   if (!email.reportValidity()) return;
   const button = $('#profileSendResetCode');
   button.disabled = true;
-  profilePasswordResetStatus.textContent = 'Sending a verification code…';
+  profilePasswordResetStatus.textContent = 'Sending a secure reset link…';
   try {
-    const result = await accountRequest('/api/auth/password-reset/send', {email:email.value.trim().toLowerCase()});
-    $('#profileResetFields').hidden = false;
-    profilePasswordResetStatus.textContent = result.message || 'If this email has an account, a reset code has been sent.';
-    $('#profileResetCode').focus();
+    const {auth, sendPasswordResetEmail} = await getFirebaseAuth();
+    await sendPasswordResetEmail(auth, email.value.trim().toLowerCase());
+    profilePasswordResetStatus.textContent = 'If this email has an account, Firebase sent a password reset link. Follow it, then sign in with your new password.';
   } catch (error) {
     profilePasswordResetStatus.textContent = error.message;
   } finally { button.disabled = false; }
 };
 profilePasswordResetForm.onsubmit = async event => {
   event.preventDefault();
-  const email = $('#profileResetEmail').value.trim().toLowerCase();
-  const code = $('#profileResetCode').value.trim();
-  const password = $('#profileResetNewPassword').value;
-  if (!/^\d{6}$/.test(code)) { profilePasswordResetStatus.textContent = 'Enter the six-digit code sent to your email.'; return; }
-  if (password !== $('#profileResetConfirmPassword').value) { profilePasswordResetStatus.textContent = 'The new passwords do not match.'; return; }
-  const button = $('#profileResetSubmit');
-  button.disabled = true;
-  profilePasswordResetStatus.textContent = 'Verifying code and updating password…';
-  try {
-    await accountRequest('/api/auth/password-reset', {email, code, newPassword:password});
-    profilePasswordResetStatus.textContent = 'Password reset. Please sign in again with your new password.';
-    setTimeout(() => location.reload(), 900);
-  } catch (error) {
-    profilePasswordResetStatus.textContent = error.message;
-  } finally { button.disabled = false; }
 };
 function setProfileOpen(open) {
   profilePopover.hidden = !open;
@@ -4699,9 +4866,11 @@ $('#accountSignOut').onclick = async () => {
 };
 async function initializeAccount() {
   const user = await accountRequest('/api/auth/me');
+  currentUserRecord = user;
   activeAccountName = (user.username || '').toLowerCase();
   currentRole = user.role;
-  $('#adminTeamNav').hidden = user.role !== 'Admin';
+  activeCompanyId = user.activeCompanyId || null;
+  await loadWorkspaceProfile();
   const currentGuidelines = await api('/api/guidelines');
   if (currentGuidelines?.accessibility) {
     contrastThresholds = {
@@ -4722,14 +4891,22 @@ async function initializeAccount() {
   $('#profileWork').textContent = user.work || 'Not provided';
   fillProfileEditor(user);
   await Promise.all([refreshGuidelineCounts(), refreshHistoryMetrics(), refreshStorageStatus()]);
-  loadBrandAssets();
-  loadCalendar();
+  await Promise.all([loadBrandAssets(), loadCalendar(), loadAlerts()]);
   $('#roleScopeTag').style.display = 'none';
   $('#view-settings').querySelector('#keyGemini').closest('.white-panel').hidden = user.role !== 'Admin';
   document.documentElement.dataset.signedIn = 'true';
   accountForm.reset();
   await loadAuditPreferences();
-  if (user.role === 'Admin') { loadKeys(); loadAdminTeam(); }
+  if (user.role === 'Admin') loadKeys();
+  if (activeCompanyRole === 'Admin') loadAdminTeam();
+  try {
+    const savedDraft = JSON.parse(localStorage.getItem(localKey('unsaved-draft')) || 'null');
+    if (savedDraft && !$('#workspaceInput').value.trim() && (savedDraft.content || savedDraft.title) && confirm('Restore the unsaved draft saved in this browser?')) {
+      $('#workspaceInput').value = savedDraft.content || '';
+      $('#auditTitleInput').value = savedDraft.title || '';
+      const status = $('#auditDraftStatus'); if (status) status.textContent = 'Unsaved draft restored from this browser.';
+    }
+  } catch {}
 }
 initializeAccount().catch(() => {});
 
@@ -4784,6 +4961,7 @@ let browserAiWorkerUrl = '';
 let browserAiModel = '';
 let aiLoadGeneration = 0;
 let aiLoadCancelled = false;
+let browserAiLoadPromise = null;
 
 function updateAiStatus(message, state = '') {
   const status = document.querySelector('#aiReviewStatus');
@@ -4933,6 +5111,14 @@ async function ensureBrowserModel(requestedModel) {
   }
 }
 
+function getOrLoadBrowserModel(model) {
+  if (browserAiEngine && browserAiModel && browserAiModel.startsWith(model.includes('3B') ? 'Llama-3.2-3B' : 'Llama-3.2-1B')) return Promise.resolve(browserAiModel);
+  if (!browserAiLoadPromise) {
+    browserAiLoadPromise = ensureBrowserModel(model).finally(() => { browserAiLoadPromise = null; });
+  }
+  return browserAiLoadPromise;
+}
+
 function parseAiFindings(output) {
   let text = String(output || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
   const firstObject = text.indexOf('{');
@@ -5036,7 +5222,7 @@ includeGeminiCheckbox.addEventListener('change', async () => {
   try {
     const selectedModel = aiProviderSelect.value === 'browser-3b' ? AI_MODELS.llama3b : AI_MODELS.llama1b;
     await getAiContext();
-    await ensureBrowserModel(selectedModel);
+    await getOrLoadBrowserModel(selectedModel);
   } catch (error) {
     if (String(error?.message || '').toLowerCase().includes('cancel')) return;
     updateAiStatus(`${friendlyAiError(error)} Deterministic checks remain available.`, 'error');
@@ -5045,7 +5231,7 @@ includeGeminiCheckbox.addEventListener('change', async () => {
 aiProviderSelect.addEventListener('change', () => {
   if (includeGeminiCheckbox.checked && aiProviderSelect.value.startsWith('browser-')) {
     const model = aiProviderSelect.value === 'browser-3b' ? AI_MODELS.llama3b : AI_MODELS.llama1b;
-    ensureBrowserModel(model).catch(error => updateAiStatus(`${friendlyAiError(error)} Deterministic checks remain available.`, 'error'));
+    getOrLoadBrowserModel(model).catch(error => updateAiStatus(`${friendlyAiError(error)} Deterministic checks remain available.`, 'error'));
   }
 });
 
