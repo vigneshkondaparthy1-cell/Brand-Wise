@@ -204,6 +204,13 @@ def _send_otp_message(email, code, password_reset=False):
                     except (ValueError, UnicodeDecodeError):
                         pass
                     message = f'Resend could not send the {purpose} code (HTTP {exc.code}).'
+                    if exc.code == 403:
+                        if 'resend.dev' in resend_sender.casefold():
+                            detail = 'The Resend test sender can only deliver to the email address that owns the Resend account. For verification emails to other users, verify a sending domain and use a sender address on that domain in RESEND_FROM.'
+                        else:
+                            detail = 'Resend denied this sender. Verify the sending domain used by RESEND_FROM and make sure RESEND_API_KEY belongs to the same Resend account and has email-sending access. Update the Render environment variables and redeploy.'
+                    elif exc.code == 401:
+                        detail = 'Resend rejected the API key. Replace RESEND_API_KEY in the Render environment with an active key from the same Resend account, then redeploy.'
                     if detail:
                         message += f' {detail[:240]}'
                     raise EmailDeliveryError(message) from None
