@@ -11,8 +11,10 @@ import urllib.parse
 import urllib.request
 import urllib.error
 import html as html_lib
+import database
 from document_ingestion import extract_document
 from gemini_review import review as gemini_review
+import review_validation
 
 ROOT = Path(__file__).resolve().parent
 DB = ROOT / 'audit-data.json'
@@ -22,34 +24,12 @@ INSIGHTS_DB = ROOT / 'insights-data.json'
 AUDIT_PREFERENCES_DB = ROOT / 'workspace-audit-preferences.json'
 ENV_FILE = ROOT / '.env'
 PAGE = 'The-Final-Draft-Hackathon-Updated.html'
-LOGIN_FAILURES = {}
-LOGIN_FAILURES_LOCK = threading.Lock()
-LOGIN_WINDOW_SECONDS = 900
-LOGIN_MAX_FAILURES = 8
 OTP_REQUESTS = {}
 OTP_REQUESTS_LOCK = threading.Lock()
 OTP_REQUEST_WINDOW_SECONDS = 600
 OTP_REQUEST_MAXIMUM = 5
 AUDIT_PREFERENCES_LOCK = threading.Lock()
 DEFAULT_AUDIT_PREFERENCES = {'strictness': 'balanced', 'passingThreshold': 80}
-
-
-def login_is_limited(client_ip):
-    now = time.monotonic()
-    with LOGIN_FAILURES_LOCK:
-        recent = [stamp for stamp in LOGIN_FAILURES.get(client_ip, []) if now - stamp < LOGIN_WINDOW_SECONDS]
-        LOGIN_FAILURES[client_ip] = recent
-        return len(recent) >= LOGIN_MAX_FAILURES
-
-
-def record_login_failure(client_ip):
-    with LOGIN_FAILURES_LOCK:
-        LOGIN_FAILURES.setdefault(client_ip, []).append(time.monotonic())
-
-
-def clear_login_failures(client_ip):
-    with LOGIN_FAILURES_LOCK:
-        LOGIN_FAILURES.pop(client_ip, None)
 
 def allow_otp_request(client_ip):
     now = time.monotonic()
@@ -111,11 +91,6 @@ def get_masked_keys():
             "service": "OpenAI GPT-4o",
             "role": "Structured JSON & Format Normalization"
         },
-        "slack": {
-            **mask(os.environ.get("SLACK_WEBHOOK_URL", "").strip(), 12, 5),
-            "service": "Slack Incoming Webhook",
-            "role": "#brand-governance-alerts Channel Notifications"
-        }
     }
 
 def save_env_keys(keys_dict):
@@ -123,16 +98,22 @@ def save_env_keys(keys_dict):
         if v is not None and v != "••••••••":
             os.environ[k] = v.strip()
     try:
-        lines = [
-            "# BrandWise Platform Configuration & API Keys",
-            f"ANTHROPIC_API_KEY={os.environ.get('ANTHROPIC_API_KEY', '')}",
-            f"GEMINI_API_KEY={os.environ.get('GEMINI_API_KEY', '')}",
-            f"OPENAI_API_KEY={os.environ.get('OPENAI_API_KEY', '')}",
-            f"SLACK_WEBHOOK_URL={os.environ.get('SLACK_WEBHOOK_URL', '')}",
-            "BRANDWISE_PORT=8765",
-            "BRANDWISE_ENV=production"
-        ]
-        ENV_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        updates = {key: os.environ.get(key, '') for key in keys_dict}
+        lines = ENV_FILE.read_text(encoding='utf-8').splitlines() if ENV_FILE.exists() else []
+        written = set()
+        output = []
+        for line in lines:
+            match = re.match(r'^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=', line)
+            if match and match.group(1) in updates:
+                key = match.group(1)
+                output.append(f'{key}={updates[key]}')
+                written.add(key)
+            else:
+                output.append(line)
+        for key, value in updates.items():
+            if key not in written:
+                output.append(f'{key}={value}')
+        ENV_FILE.write_text("\n".join(output).rstrip() + "\n", encoding="utf-8")
         return True
     except Exception:
         return False
@@ -161,10 +142,6 @@ def test_external_api_key(provider, api_key):
             req = urllib.request.Request(url, method="GET")
             with urllib.request.urlopen(req, timeout=8) as resp:
                 return {"valid": True, "provider": "Google Gemini", "status": resp.status, "model": "gemini-3.5-flash-lite"}
-        elif provider == "slack":
-            if not api_key.startswith("https://hooks.slack.com/"):
-                return {"valid": False, "provider": "Slack", "error": "Invalid Slack webhook URL format (must start with https://hooks.slack.com/)"}
-            return {"valid": True, "provider": "Slack Webhook", "status": 200, "note": "Valid webhook URL format"}
         return {"valid": False, "provider": provider, "error": f"Unknown provider: {provider}"}
     except urllib.error.HTTPError as e:
         err_msg = f"HTTP {e.code}: {e.reason}"
@@ -552,6 +529,8 @@ DEFAULT_AUDITS = [
 
 
 def load_json(path, fallback):
+    if database.uses_postgres():
+        return database.get_json(path.name, fallback, path)
     try:
         if path.exists():
             return json.loads(path.read_text(encoding='utf-8'))
@@ -561,6 +540,8 @@ def load_json(path, fallback):
 
 
 def save_json(path, data):
+    if database.uses_postgres():
+        return database.save_json(path.name, data)
     try:
         path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding='utf-8')
         return True
@@ -569,7 +550,12 @@ def save_json(path, data):
 
 
 def get_audits():
-    return load_json(DB, DEFAULT_AUDITS)
+    audits = load_json(DB, DEFAULT_AUDITS)
+    sample_ids = {item.get('id') for item in DEFAULT_AUDITS}
+    for audit in audits:
+        if audit.get('id') in sample_ids:
+            audit.setdefault('sampleData', True)
+    return audits
 
 
 def get_workspace_audit_preferences():
@@ -610,8 +596,21 @@ def compliance_score(findings, strictness='balanced'):
         'balanced': {'Critical': 25, 'High': 15, 'Medium': 8, 'Low': 4},
         'strict': {'Critical': 30, 'High': 20, 'Medium': 10, 'Low': 5},
     }.get(strictness, {'Critical': 25, 'High': 15, 'Medium': 8, 'Low': 4})
-    deductions = sum(penalties.get(f.get('severity', 'Medium'), 8) for f in findings if f.get('category') != 'Accessibility - Readability')
-    return max(0, min(100, 100 - deductions))
+    deductions = sum(penalties.get(f.get('severity', 'Medium'), 8) for f in findings)
+    score = max(0, min(100, 100 - deductions))
+    # Content with unresolved issues cannot receive a perfect score
+    unresolved = any((f.get('actionStatus') or 'pending') == 'pending' for f in findings)
+    if unresolved and score >= 100:
+        score = 95
+    return score
+
+
+def audits_visible_to_user(audits, user):
+    """External agencies can only access work belonging to their own organization."""
+    if user.get('role') != 'External Agency':
+        return audits
+    organization = (user.get('organization') or '').strip().casefold()
+    return [audit for audit in audits if (audit.get('agency') or '').strip().casefold() == organization]
 
 
 def get_claims():
@@ -674,10 +673,40 @@ def check_text_accessibility(content, guidelines=None):
     }
 
 
+def evaluate_labelled_ruleset():
+    """Measure the checked-in synthetic labeled set; never present it as production accuracy."""
+    cases_path = ROOT / 'evaluation' / 'test_set.json'
+    try:
+        cases = json.loads(cases_path.read_text(encoding='utf-8'))
+        claims = get_claims()
+        guidelines = get_guidelines()
+        by_label = {'compliant': [0, 0], 'noncompliant': [0, 0]}
+        for case in cases:
+            label = case.get('label')
+            if label not in by_label or not isinstance(case.get('text'), str):
+                continue
+            flagged = bool(run_brandwise_checks(case['text'], channel=case.get('channel', 'Website Copy'), _claims=claims, _guidelines=guidelines)['findings'])
+            total, errors = by_label[label]
+            by_label[label] = [total + 1, errors + int(flagged != (label == 'noncompliant'))]
+        compliant_count, false_flags = by_label['compliant']
+        noncompliant_count, missed = by_label['noncompliant']
+        return {
+            'dataset': 'Checked-in synthetic labeled evaluation set',
+            'caseCount': compliant_count + noncompliant_count,
+            'compliantCases': compliant_count,
+            'noncompliantCases': noncompliant_count,
+            'detectionRate': round(100 * (noncompliant_count - missed) / noncompliant_count, 1) if noncompliant_count else None,
+            'falseFlagRate': round(100 * false_flags / compliant_count, 1) if compliant_count else None,
+            'productionBenchmark': False
+        }
+    except (OSError, ValueError, TypeError, KeyError, ZeroDivisionError):
+        return None
+
+
 # Run multi-dimensional checks (Claims, Tone, Terminology, Banned words, Visual, WCAG, Uncertainty)
-def run_brandwise_checks(content, channel="Website Copy", reference=None, strictness="balanced"):
-    claims = get_claims()
-    guidelines = get_guidelines()
+def run_brandwise_checks(content, channel="Website Copy", reference=None, strictness="balanced", _claims=None, _guidelines=None):
+    claims = _claims if _claims is not None else get_claims()
+    guidelines = _guidelines if _guidelines is not None else get_guidelines()
     findings = []
     content_lower = content.casefold()
     accessibility_result = check_text_accessibility(content, guidelines)
@@ -740,11 +769,17 @@ def run_brandwise_checks(content, channel="Website Copy", reference=None, strict
             'actionStatus': 'pending'
         })
 
-    # 1. Check Founding Year / Legal Establishment
+    # Read identity facts from the current claim ledger rather than embedding demo facts.
+    identity_claim = next((claim for claim in claims
+                           if 'company identity' in claim.get('category', '').casefold()
+                           and claim.get('status') == 'Active'
+                           and claim.get('expiry', '') >= datetime.now(timezone.utc).date().isoformat()), None)
+    identity_year_match = re.search(r'\b(?:18|19|20)\d{2}\b', identity_claim.get('statement', '')) if identity_claim else None
+    identity_year = identity_year_match.group(0) if identity_year_match else None
     founding_matches = list(re.finditer(r'(?:founded|established|founding\s*year)\s*(?:in|—|-|:)?\s*(\b(?:18|19|20)\d{2}\b)', content, re.I))
     for m in founding_matches:
         year_claimed = m.group(1)
-        if year_claimed != "2012":
+        if identity_year and year_claimed != identity_year:
             findings.append({
                 "id": f"FND-YR-{len(findings)+1}",
                 "location": f"Offset {m.start()}..{m.end()}",
@@ -752,59 +787,46 @@ def run_brandwise_checks(content, channel="Website Copy", reference=None, strict
                 "title": "Founding year mismatch",
                 "severity": "High",
                 "wrong": m.group(0),
-                "why": f"Founding year claimed ({year_claimed}) conflicts with official incorporation records (2012).",
-                "sourceId": "CLM-002",
-                "official": "Delaware Certificate of Incorporation #4829104: Established in 2012.",
-                "owner": "Marcus Vance (Chief Legal Counsel)",
-                "expiry": "2030-01-01",
+                "why": f"Founding year claimed ({year_claimed}) conflicts with the current company identity claim ({identity_year}).",
+                "sourceId": identity_claim.get('id', ''),
+                "official": f"{identity_claim.get('statement', '')}. Evidence: {identity_claim.get('evidence', 'No evidence recorded')}.",
+                "owner": identity_claim.get('owner', ''),
+                "expiry": identity_claim.get('expiry', ''),
                 "state": "source-verified",
-                "confidence": 98,
-                "fix": m.group(0).replace(year_claimed, "2012"),
+                "confidence": 100,
+                "fix": m.group(0).replace(year_claimed, identity_year),
                 "actionStatus": "pending"
             })
 
-    # 2. Check Onboarding / Performance Metric Claim (from PDF Example page 6)
-    perf_match = re.search(r'cuts?\s+onboarding(?:\s+time)?\s+by\s+(\d+)%', content, re.I)
-    if perf_match:
-        pct_num = int(perf_match.group(1))
-        if pct_num > 20:
+    # Compare numeric onboarding assertions with the current active ledger evidence.
+    performance_claim = next((claim for claim in claims
+                              if 'product performance' in claim.get('category', '').casefold()
+                              and claim.get('status') == 'Active'
+                              and claim.get('expiry', '') >= datetime.now(timezone.utc).date().isoformat()), None)
+    benchmark_match = re.search(r'(\d+(?:\.\d+)?)\s*%', performance_claim.get('statement', '')) if performance_claim else None
+    max_supported = float(benchmark_match.group(1)) if benchmark_match else None
+    perf_matches = list(re.finditer(r'cuts?\s+onboarding(?:\s+time)?\s+by\s+(\d+(?:\.\d+)?)\s*%', content, re.I))
+    if max_supported is not None and performance_claim:
+      for perf_match in perf_matches:
+        pct_num = float(perf_match.group(1))
+        if pct_num > max_supported:
             findings.append({
                 "id": f"FND-PRF-{len(findings)+1}",
                 "location": f"Offset {perf_match.start()}..{perf_match.end()}",
                 "category": "Unsupported Performance Claim",
-                "title": f"Unsubstantiated onboarding reduction claim ({pct_num}% vs approved 20%)",
+                "title": f"Unsubstantiated onboarding reduction claim ({pct_num:g}% vs approved {max_supported:g}%)",
                 "severity": "High",
                 "wrong": perf_match.group(0),
-                "why": f"Approved claim benchmark is up to 20%. No approved source in the claims ledger validates {pct_num}%.",
-                "sourceId": "CLM-001",
-                "official": "Claim CLM-001: Cuts onboarding time by up to 20% (Benchmark Study Section 4.2).",
-                "owner": "Sarah Jenkins (VP Product)",
-                "expiry": "2027-12-31",
+                "why": f"The current approved benchmark is up to {max_supported:g}%. No current ledger source validates {pct_num:g}%.",
+                "sourceId": performance_claim.get('id', ''),
+                "official": f"{performance_claim.get('statement', '')}. Evidence: {performance_claim.get('evidence', 'No evidence recorded')}.",
+                "owner": performance_claim.get('owner', ''),
+                "expiry": performance_claim.get('expiry', ''),
                 "state": "source-verified",
                 "confidence": 96,
-                "fix": "cuts onboarding time by up to 20%",
+                "fix": performance_claim.get('statement', ''),
                 "actionStatus": "pending"
             })
-
-    # 3. Check for Expired Claims (e.g. $49 pricing) -> Triggers explicit "Cannot verify - needs human check"
-    if ("$49" in content or "49/month" in content_lower or "49 dollars" in content_lower) and not any(f.get("sourceId") == "CLM-005" for f in findings):
-        findings.append({
-            "id": f"FND-EXP-{len(findings)+1}",
-            "location": "Pricing section",
-            "category": "Expired Claim / Missing Current Proof",
-            "title": "Pricing claim cannot be verified (Source expired)",
-            "severity": "High",
-            "wrong": "$49/month",
-            "why": "The referenced pricing catalog (CLM-005) expired on 2025-01-01. As required by BrandWise reliability standards, expired evidence cannot be accepted and requires human verification.",
-            "sourceId": "CLM-005",
-            "official": "Claim CLM-005: Starter tier was $49/mo (EXPIRED 2025-01-01). Current 2026 catalog is $79/mo.",
-            "owner": "Finance Operations",
-            "expiry": "2025-01-01 (EXPIRED)",
-            "state": "cannot verify - needs human check",
-            "confidence": 95,
-            "fix": "starting at $79 per seat per month (verify with pricing desk)",
-            "actionStatus": "pending"
-        })
 
     # 4. Prohibited Terminology & Superlatives Checks (Deterministic + AI Style Rules)
     prohibited_terms = guidelines.get("terminology", {}).get("prohibited", [])
@@ -812,27 +834,30 @@ def run_brandwise_checks(content, channel="Website Copy", reference=None, strict
         raw_term = p["term"]
         term = raw_term.casefold()
 
-        # Special case: brand name casing (e.g. "Brandwise" should only flag if NOT "BrandWise")
-        if term == "brandwise":
-            for bad_casing in re.finditer(r'\bbrandwise\b', content, re.I):
-                if bad_casing.group(0) != "BrandWise":
-                    findings.append({
-                        "id": f"FND-TRM-{len(findings)+1}",
-                        "location": f"Offset {bad_casing.start()}",
-                        "category": "Brand Consistency",
-                        "title": "Brand name capitalization error",
-                        "severity": "Medium",
-                        "wrong": bad_casing.group(0),
-                        "why": "Official brand identity requires camel-case capitalization: 'BrandWise'.",
-                        "sourceId": "GL-STYLE-01",
-                        "official": "Brand Identity Style Guide, Page 3: BrandWise.",
-                        "owner": "Design Systems Team",
-                        "expiry": "Active guideline",
-                        "state": "source-verified",
-                        "confidence": 100,
-                        "fix": "BrandWise",
-                        "actionStatus": "pending"
-                    })
+        # Dynamic brand name casing from guidelines
+        product_name = guidelines.get("productName", "BrandWise")
+        if term == product_name.casefold():
+            for bad_casing in re.finditer(r'\b' + re.escape(product_name) + r'\b', content, re.I):
+                if bad_casing.group(0) != product_name:
+                    if not any(f.get("wrong") == bad_casing.group(0) for f in findings):
+                        findings.append({
+                            "id": f"FND-TRM-{len(findings)+1}",
+                            "location": f"Offset {bad_casing.start()}",
+                            "category": "Brand Consistency",
+                            "title": "Brand name capitalization error",
+                            "severity": "Medium",
+                            "wrong": bad_casing.group(0),
+                            "why": f"Official brand identity requires camel-case capitalization: '{product_name}'.",
+                            "sourceId": "GL-STYLE-01",
+                            "official": f"Brand Identity Style Guide, Page 3: {product_name}.",
+                            "owner": "Design Systems Team",
+                            "expiry": "Active guideline",
+                            "state": "source-verified",
+                            "confidence": 100,
+                            "confidenceBasis": "Exact deterministic rule match against guidelines",
+                            "fix": product_name,
+                            "actionStatus": "pending"
+                        })
             continue
 
         if term in content_lower:
@@ -851,7 +876,8 @@ def run_brandwise_checks(content, channel="Website Copy", reference=None, strict
                 "owner": "Brand Governance Council",
                 "expiry": "Active guideline",
                 "state": "source-verified",
-                "confidence": 97,
+                "confidence": 100,
+                "confidenceBasis": "Exact deterministic rule match",
                 "fix": p.get("suggested", ""),
                 "actionStatus": "pending"
             })
@@ -880,26 +906,7 @@ def run_brandwise_checks(content, channel="Website Copy", reference=None, strict
                 "actionStatus": "pending"
             })
 
-    # 6. Brand Name Capitalization Check ("Brandwise" vs "BrandWise")
-    for bad_casing in re.finditer(r'\bBrandwise\b', content):
-        if not any(f["wrong"] == "Brandwise" for f in findings):
-            findings.append({
-                "id": f"FND-CAS-{len(findings)+1}",
-                "location": f"Offset {bad_casing.start()}",
-                "category": "Brand Consistency",
-                "title": "Brand name capitalization error",
-                "severity": "Medium",
-                "wrong": "Brandwise",
-                "why": "Official brand identity requires camel-case capitalization: 'BrandWise'.",
-                "sourceId": "GL-STYLE-01",
-                "official": "Brand Identity Style Guide, Page 3: BrandWise.",
-                "owner": "Design Systems Team",
-                "expiry": "Active guideline",
-                "state": "source-verified",
-                "confidence": 100,
-                "fix": "BrandWise",
-                "actionStatus": "pending"
-            })
+
 
     # 7. Check Mandatory Disclaimer for Marketing Copy / Websites (if applicable)
     req_disc = guidelines.get("requiredDisclaimer", "").strip()
@@ -993,16 +1000,15 @@ def run_brandwise_checks(content, channel="Website Copy", reference=None, strict
                 'actionStatus': 'pending'
             })
 
-    # Compute Compliance Score: deductions based on severity
+    # Compute Compliance Score: every active finding, including readability, counts.
     for finding in findings:
-        if finding.get('category') == 'Accessibility - Readability':
-            continue
-        finding['confidence'] = 100
-        finding['confidenceBasis'] = 'Exact deterministic rule match'
+        if finding.get('confidence') is None:
+            finding['confidence'] = 100
+            finding['confidenceBasis'] = 'Exact deterministic rule match'
 
     score = compliance_score(findings, strictness)
     # Calculate average confidence
-    conf = int(sum(f.get("confidence", 90) for f in findings) / len(findings)) if findings else 98
+    conf = int(sum(f.get("confidence", 90) for f in findings) / len(findings)) if findings else None
 
     return {
         "score": score,
@@ -1011,6 +1017,16 @@ def run_brandwise_checks(content, channel="Website Copy", reference=None, strict
         "accessibility": accessibility_result,
         "strictness": strictness,
     }
+
+
+def storage_errors_as_503(handler):
+    def wrapped(self, *args, **kwargs):
+        try:
+            return handler(self, *args, **kwargs)
+        except database.DatabaseUnavailable:
+            self.log_error('Configured PostgreSQL storage is unavailable.')
+            return self.send_json(503, {'error': 'Workspace storage is temporarily unavailable. Please try again.'})
+    return wrapped
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -1025,21 +1041,18 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('Content-Type', 'application/json; charset=utf-8')
         self.send_header('Content-Length', str(len(payload)))
         self.send_header('Cache-Control', 'no-store')
+        self.send_header('X-Content-Type-Options', 'nosniff')
+        self.send_header('X-Frame-Options', 'DENY')
+        self.send_header('Referrer-Policy', 'strict-origin-when-cross-origin')
         if cookie:
             self.send_header('Set-Cookie', cookie)
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
         self.end_headers()
         self.wfile.write(payload)
 
     def do_OPTIONS(self):
-        self.send_response(204)
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-        self.end_headers()
+        self.send_error(405, 'Cross-origin API requests are not supported.')
 
+    @storage_errors_as_503
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
@@ -1054,6 +1067,32 @@ class Handler(BaseHTTPRequestHandler):
             user = accounts.current_user(self.headers)
             if not user:
                 return self.send_json(401, {'error': 'Sign in first.'})
+            if path == '/api/ai/context':
+                today = datetime.now(timezone.utc).date().isoformat()
+                compact_claims = [
+                    {
+                        'id': claim.get('id', ''),
+                        'statement': claim.get('statement', ''),
+                        'prohibitedPhrases': claim.get('prohibitedPhrases', []),
+                    }
+                    for claim in get_claims()
+                    if claim.get('status') == 'Active' and (not claim.get('expiry') or claim.get('expiry', '') >= today)
+                ]
+                guidelines = get_guidelines()
+                terminology = guidelines.get('terminology', {})
+                compact_guidelines = {
+                    'tone': {
+                        'primary': guidelines.get('tone', {}).get('primary', ''),
+                        'avoid': guidelines.get('tone', {}).get('avoid', ''),
+                        'rules': guidelines.get('tone', {}).get('rules', []),
+                    },
+                    'prohibitedTerms': [
+                        {key: item.get(key, '') for key in ('term', 'reason', 'suggested', 'severity')}
+                        for item in terminology.get('prohibited', []) if isinstance(item, dict)
+                    ],
+                }
+                providers = {'browser': True, 'gemini': bool(os.environ.get('GEMINI_API_KEY', '').strip())}
+                return self.send_json(200, {'claims': compact_claims, 'guidelines': compact_guidelines, 'providers': providers})
             if path == '/api/admin/team':
                 if user['role'] != 'Admin':
                     return self.send_json(403, {'error': 'Administrator access required.'})
@@ -1065,22 +1104,24 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json(200, get_workspace_audit_preferences())
 
         if path == '/api/health':
-            return self.send_json(200, {
+            storage = database.ping()
+            return self.send_json(200 if storage['connected'] else 503, {
                 'ok': True,
                 'service': 'BrandWise Governance Platform API',
                 'version': '2.4.0',
                 'workingTitle': 'BrandWise',
                 'preparedBy': 'Brand Wise',
+                'storage': storage,
                 'engines': {
                     'rules': 'Deterministic WCAG 2.1 & Terminology Engine',
                     'claims': 'Claims Ledger & Expiry Verification Engine',
-                    'llm': 'Disclosed External AI (Claude 3.5 Sonnet / Vision)',
+                    'llm': 'Optional external text review via Gemini; no image or OCR review',
                     'uncertaintyMode': 'Active ("Cannot verify - needs human check" enabled)'
                 }
             })
 
         if path == '/api/audits':
-            audits = get_audits()
+            audits = audits_visible_to_user(get_audits(), user)
             # Support filters: status, channel, role, agency, search
             if 'status' in query:
                 st = query['status'][0]
@@ -1097,7 +1138,7 @@ class Handler(BaseHTTPRequestHandler):
 
         if path.startswith('/api/audits/'):
             audit_id = path.replace('/api/audits/', '').strip()
-            audits = get_audits()
+            audits = audits_visible_to_user(get_audits(), user)
             found = next((a for a in audits if a.get('id') == audit_id), None)
             if found:
                 return self.send_json(200, found)
@@ -1115,56 +1156,42 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json(200, {'status': 'ok', 'keys': get_masked_keys()})
 
         if path == '/api/insights':
-            audits = get_audits()
-            claims = get_claims()
-            # Aggregate Insights as described in PDF Section 03 & 06
+            audits = [item for item in audits_visible_to_user(get_audits(), user) if not item.get('sampleData')]
             all_findings = [f for a in audits for f in a.get('findings', [])]
             category_counts = {}
             for f in all_findings:
                 cat = f.get('category', 'Other')
                 category_counts[cat] = category_counts.get(cat, 0) + 1
 
-            # Ambiguous guidelines detection (PDF Page 6: "unclear-guideline detection highlights rules frequently disputed or dismissed")
-            dismissed_findings = [f for f in all_findings if f.get('actionStatus') == 'dismissed']
-            ambiguous_rules = [
-                {
-                    "ruleId": "GL-SUPERLATIVE-01",
-                    "ruleTitle": "Avoid ungrounded superlatives",
-                    "dismissalCount": 7,
-                    "disputeRate": "28%",
-                    "recommendation": "Specify threshold for industry recognition vs absolute superlatives to reduce creator friction."
-                },
-                {
-                    "ruleId": "CLM-005",
-                    "ruleTitle": "Legacy starter pricing claim",
-                    "dismissalCount": 5,
-                    "disputeRate": "22%",
-                    "recommendation": "Update Claim Ledger to 2026 pricing ($79/mo) and officially retire expired $49 reference."
-                },
-                {
-                    "ruleId": "GL-TONE-INDIAN-ENG",
-                    "ruleTitle": "Formal phrasing in regional dialects",
-                    "dismissalCount": 3,
-                    "disputeRate": "14%",
-                    "recommendation": "Clarified: Indian English expressions 'prepone' and 'revert back' are marked valid."
-                }
-            ]
-
+            flagged_by_rule = {}
+            grouped_agencies = {}
+            for audit in audits:
+                org = audit.get('agency') or 'Unassigned organization'
+                group = grouped_agencies.setdefault(org, {'name': org, 'submissions': 0, 'scores': [], 'approved': 0})
+                group['submissions'] += 1
+                if isinstance(audit.get('score'), (int, float)):
+                    group['scores'].append(audit['score'])
+                group['approved'] += audit.get('status') in ('Approved', 'Published')
+                for finding in audit.get('findings', []):
+                    if finding.get('actionStatus') == 'dismissed' or finding.get('reportedIncorrect'):
+                        rule_id = finding.get('sourceId') or finding.get('category', 'Unattributed rule')
+                        item = flagged_by_rule.setdefault(rule_id, {'ruleId': rule_id, 'ruleTitle': finding.get('title', 'Finding'), 'dismissalCount': 0, 'recommendation': 'Review the finding and rule wording.'})
+                        item['dismissalCount'] += 1
+            ambiguous_rules = sorted(flagged_by_rule.values(), key=lambda item: item['dismissalCount'], reverse=True)
             agency_stats = [
-                {"name": "In-house Brand Team", "submissions": 18, "avgCompliance": 94, "approvalRate": "92%"},
-                {"name": "Apex Digital Agency", "submissions": 12, "avgCompliance": 88, "approvalRate": "83%"},
-                {"name": "SocialPulse Creative", "submissions": 9, "avgCompliance": 76, "approvalRate": "67%"}
+                {'name': group['name'], 'submissions': group['submissions'],
+                 'avgCompliance': round(sum(group['scores']) / len(group['scores'])) if group['scores'] else None,
+                 'approvalRate': round(100 * group['approved'] / group['submissions']) if group['submissions'] else None}
+                for group in grouped_agencies.values()
             ]
-
-            # Impact and evidence metrics (PDF Page 11)
+            source_linked = sum(bool(f.get('sourceId')) for f in all_findings)
             impact_evidence = {
-                "seededMistakesDetectedRate": "94.2%",
-                "reviewTurnaroundWithBrandWise": "3.2 hours",
-                "reviewTurnaroundWithoutBrandWise": "18.5 hours",
-                "timeSavings": "78% reduction in review cycle time",
-                "sourceBackedTrustShare": "96.4%",
-                "falsePositiveReportRate": "1.8%",
-                "ambiguousGuidelinesClarified": 14
+                'measurementStatus': 'Saved audit counts are operational data. Detection/false-flag rates below use the checked-in synthetic labeled set and are not production benchmarks.',
+                'savedAuditCount': len(audits),
+                'savedFindingCount': len(all_findings),
+                'sourceLinkedFindingCount': source_linked,
+                'incorrectFlagReports': sum(bool(f.get('reportedIncorrect')) for f in all_findings),
+                'labelledEvaluation': evaluate_labelled_ruleset()
             }
 
             return self.send_json(200, {
@@ -1186,12 +1213,16 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_response(200)
                 self.send_header('Content-Type', 'text/html; charset=utf-8')
                 self.send_header('Content-Length', str(len(body)))
+                self.send_header('X-Content-Type-Options', 'nosniff')
+                self.send_header('X-Frame-Options', 'DENY')
+                self.send_header('Referrer-Policy', 'strict-origin-when-cross-origin')
                 self.end_headers()
                 self.wfile.write(body)
                 return
 
         self.send_error(404, "Page or endpoint not found")
 
+    @storage_errors_as_503
     def do_POST(self):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
@@ -1219,12 +1250,14 @@ class Handler(BaseHTTPRequestHandler):
             if not allow_otp_request(self.client_address[0]):
                 return self.send_json(429, {'error': 'Too many verification requests. Wait 10 minutes and try again.'})
             try:
-                accounts.send_password_reset_otp(data.get('email'))
+                res = accounts.send_password_reset_otp(data.get('email'))
             except accounts.EmailDeliveryError as exc:
                 return self.send_json(503, {'error': str(exc)})
             except ValueError as exc:
                 return self.send_json(400, {'error': str(exc)})
-            return self.send_json(200, {'ok': True, 'message': 'If an account uses that email, a reset code has been sent.'})
+            dev_code = res.get('dev_code') if isinstance(res, dict) else None
+            msg = f'Reset code: {dev_code} (Local development mode)' if dev_code else 'If an account uses that email, a reset code has been sent.'
+            return self.send_json(200, {'ok': True, 'message': msg, 'dev_code': dev_code})
         if path == '/api/auth/password-reset':
             try:
                 accounts.reset_password_with_email_otp(data.get('email'), data.get('code'), data.get('newPassword'))
@@ -1235,12 +1268,13 @@ class Handler(BaseHTTPRequestHandler):
             if not allow_otp_request(self.client_address[0]):
                 return self.send_json(429, {'error': 'Too many verification requests. Wait 10 minutes and try again.'})
             try:
-                accounts.send_email_otp(data.get('email'))
+                res = accounts.send_email_otp(data.get('email'))
             except accounts.EmailDeliveryError as exc:
                 return self.send_json(503, {'error': str(exc)})
             except ValueError as exc:
                 return self.send_json(400, {'error': str(exc)})
-            return self.send_json(200, {'ok': True})
+            dev_code = res.get('dev_code') if isinstance(res, dict) else None
+            return self.send_json(200, {'ok': True, 'dev_code': dev_code})
         if path == '/api/auth/verify-otp':
             try:
                 accounts.verify_email_otp(data.get('email'), data.get('code'))
@@ -1254,14 +1288,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(400, {'error': str(exc)})
             return self.send_json(201, {'ok': True})
         if path == '/api/auth/login':
-            client_ip = self.client_address[0]
-            if login_is_limited(client_ip):
-                return self.send_json(429, {'error': 'Too many failed sign-in attempts. Wait 15 minutes and try again.'})
             token = accounts.login(data)
             if not token:
-                record_login_failure(client_ip)
-                return self.send_json(401, {'error': 'Username or password is incorrect.'})
-            clear_login_failures(client_ip)
+                return self.send_json(401, {'error': 'Username, email, or password is incorrect. You can try again immediately.'})
             secure = '; Secure' if self.headers.get('X-Forwarded-Proto', '').casefold() == 'https' else ''
             return self.send_json(200, {'ok': True}, f'brandwise_session={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={accounts.SESSION_AGE}{secure}')
         user = accounts.current_user(self.headers)
@@ -1285,6 +1314,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(400, {'error': str(exc)})
             return self.send_json(200, {'ok': True}, 'brandwise_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0')
         if path == '/api/audit-preferences':
+            if user['role'] not in ('Brand Manager', 'Admin'):
+                return self.send_json(403, {'error': 'Brand Manager or Administrator access required.'})
             try:
                 return self.send_json(200, set_workspace_audit_preferences(data))
             except ValueError as exc:
@@ -1342,11 +1373,46 @@ class Handler(BaseHTTPRequestHandler):
                             'fix': 'Replace with a quantified statement supported by an approved source.',
                             'actionStatus': 'pending'
                         })
-            ai_findings, ai_status = gemini_review(content, get_current_ai_reference_claims(), get_guidelines()) if data.get('useAI') is True else ([], 'AI review not requested; deterministic checks only.')
+            ai_findings = []
+            ai_status = 'AI review not requested; deterministic checks only.'
+            ai_used = False
+            if data.get('useAI') is True and data.get('aiProvider') == 'browser':
+                model_ids = {
+                    'Llama-3.2-1B-Instruct-q4f16_1-MLC': 'In-browser Llama 3.2 1B (WebLLM)',
+                    'Llama-3.2-1B-Instruct-q4f32_1-MLC': 'In-browser Llama 3.2 1B (WebLLM, q4f32 fallback)',
+                    'Llama-3.2-3B-Instruct-q4f16_1-MLC': 'In-browser Llama 3.2 3B (WebLLM)',
+                    'Llama-3.2-3B-Instruct-q4f32_1-MLC': 'In-browser Llama 3.2 3B (WebLLM, q4f32 fallback)',
+                }
+                client_ai = data.get('clientAi')
+                if isinstance(client_ai, dict) and isinstance(client_ai.get('model'), str) and client_ai.get('model') in model_ids and isinstance(client_ai.get('findings'), list):
+                    safe_findings = []
+                    for finding in client_ai['findings'][:15]:
+                        if not isinstance(finding, dict):
+                            continue
+                        safe = {}
+                        for field in ('title', 'category', 'wrong', 'why', 'sourceId', 'fix'):
+                            value = finding.get(field, '')
+                            safe[field] = str(value)[:500] if value is not None else ''
+                        severity = str(finding.get('severity', 'Medium'))[:20]
+                        safe['severity'] = severity if severity in ('Low', 'Medium', 'High', 'Critical') else 'Medium'
+                        safe_findings.append(safe)
+                    ai_findings = review_validation.validate_findings(
+                        safe_findings, content, get_current_ai_reference_claims(), 'In-browser Llama', model_ids[client_ai['model']]
+                    )
+                    ai_used = True
+                    ai_status = f"{model_ids[client_ai['model']]}; subjective findings require human review."
+                else:
+                    ai_status = 'Browser AI response was unavailable or invalid; deterministic checks only.'
+            elif data.get('useAI') is True and data.get('aiProvider') == 'gemini':
+                if os.environ.get('GEMINI_API_KEY', '').strip():
+                    ai_findings, ai_status = gemini_review(content, get_current_ai_reference_claims(), get_guidelines())
+                    ai_used = True
+                else:
+                    ai_status = 'Gemini is not configured; deterministic checks only.'
             check_result['findings'].extend(ai_findings)
             check_result['score'] = compliance_score(check_result['findings'], strictness)
             confidence_values = [f.get('confidence') if isinstance(f.get('confidence'), (int, float)) else 100 for f in check_result['findings']]
-            check_result['confidence'] = int(sum(confidence_values) / len(confidence_values)) if confidence_values else 98
+            check_result['confidence'] = int(sum(confidence_values) / len(confidence_values)) if confidence_values else None
 
             audit_id = 'BW-' + datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')
             now_iso = datetime.now(timezone.utc).isoformat()
@@ -1357,6 +1423,7 @@ class Handler(BaseHTTPRequestHandler):
                 'channel': channel,
                 'type': channel,
                 'creator': creator,
+                'creatorUsername': user['username'],
                 'agency': agency,
                 'role': role,
                 'status': 'Review required' if check_result['score'] < passing_threshold else 'Ready for review',
@@ -1365,7 +1432,7 @@ class Handler(BaseHTTPRequestHandler):
                 'confidence': check_result['confidence'],
                 'passingThreshold': passing_threshold,
                 'passedThreshold': check_result['score'] >= passing_threshold,
-                'settings': {'strictness': strictness, 'passingThreshold': passing_threshold, 'useAI': data.get('useAI') is True},
+                'settings': {'strictness': strictness, 'passingThreshold': passing_threshold, 'useAI': ai_used, 'aiProvider': data.get('aiProvider') if ai_used else None},
                 'aiStatus': ai_status,
                 'accessibility': check_result['accessibility'],
                 'content': content,
@@ -1397,7 +1464,7 @@ class Handler(BaseHTTPRequestHandler):
             audit_id = path.replace('/api/audits/', '').replace('/action', '').strip()
             audits = get_audits()
             target_audit = next((a for a in audits if a.get('id') == audit_id), None)
-            if not target_audit:
+            if not target_audit or target_audit not in audits_visible_to_user(audits, user):
                 return self.send_json(404, {'error': f'Audit {audit_id} not found'})
 
             action_type = data.get('action') # 'accept_fix', 'edit_fix', 'dismiss_fix', 'change_state', 'add_comment', 'report_incorrect_flag'
@@ -1468,16 +1535,35 @@ class Handler(BaseHTTPRequestHandler):
             elif action_type == 'change_state':
                 new_state = data.get('state') # 'Draft', 'Auto-checked', 'In review', 'Changes requested', 'Approved', 'Published'
                 note = data.get('note', '')
-                valid_states = ['Draft', 'Auto-checked', 'In review', 'Changes requested', 'Approved', 'Published']
-                if new_state in valid_states:
-                    old_state = target_audit.get('status')
-                    target_audit['status'] = new_state
-                    target_audit['auditTrail'].append({
-                        'action': f"State Changed: {old_state} -> {new_state}",
-                        'user': user_name,
-                        'timestamp': now_iso,
-                        'note': note or f"Moved to {new_state}"
-                    })
+                old_state = target_audit.get('status')
+                allowed = {'Ready for review', 'Review required', 'In review', 'Changes requested', 'Auto-checked'}
+                if new_state == 'Changes requested':
+                    if user['role'] not in ('Reviewer', 'Brand Manager', 'Admin') or old_state not in allowed:
+                        return self.send_json(403, {'error': 'Only a reviewer or brand manager can request changes on an active review.'})
+                elif new_state == 'Approved':
+                    if user['role'] not in ('Reviewer', 'Brand Manager', 'Admin'):
+                        return self.send_json(403, {'error': 'Reviewer or Brand Manager approval is required.'})
+                    if old_state not in allowed:
+                        return self.send_json(409, {'error': 'This audit is not in a state that can be approved.'})
+                    threshold = int(target_audit.get('passingThreshold', get_workspace_audit_preferences()['passingThreshold']))
+                    blocking = [f for f in target_audit.get('findings', []) if f.get('severity') in ('Critical', 'High') and f.get('actionStatus', 'pending') == 'pending']
+                    if float(target_audit.get('score', 0)) < threshold or blocking:
+                        return self.send_json(409, {'error': f"Resolve critical/high findings and meet the {threshold}% passing threshold before approval."})
+                elif new_state == 'Published':
+                    if user['role'] not in ('Reviewer', 'Brand Manager', 'Admin'):
+                        return self.send_json(403, {'error': 'Reviewer or Brand Manager publishing permission is required.'})
+                    pending = [f for f in target_audit.get('findings', []) if f.get('actionStatus', 'pending') == 'pending']
+                    if old_state != 'Approved' or pending:
+                        return self.send_json(409, {'error': 'Approve this audit and resolve or disposition every finding before publishing.'})
+                else:
+                    return self.send_json(400, {'error': 'Unsupported audit state transition.'})
+                target_audit['status'] = new_state
+                target_audit.setdefault('auditTrail', []).append({
+                    'action': f"State Changed: {old_state} -> {new_state}",
+                    'user': user_name,
+                    'timestamp': now_iso,
+                    'note': note or f"Moved to {new_state}"
+                })
 
             elif action_type == 'add_comment':
                 comment_text = data.get('text', '').strip()
@@ -1522,54 +1608,12 @@ class Handler(BaseHTTPRequestHandler):
             save_json(GUIDELINES_DB, data)
             return self.send_json(200, {'success': True, 'guidelines': data})
 
-        # 5. Simulated Slack Webhook Notification (PDF Page 8, Phase 2)
-        if path == '/api/notify/slack':
-            channel_name = data.get('channel', '#brand-approvals')
-            title = data.get('title', 'Brand Review Update')
-            status_text = data.get('status', 'In Review')
-            doc_id = data.get('docId', 'BW-2026-001')
-            actor = data.get('actor', 'Alex Rivera')
-            message = data.get('message', 'Content review update triggered.')
-
-            slack_payload = {
-                "channel": channel_name,
-                "username": "BrandWise Bot",
-                "icon_emoji": ":shield:",
-                "attachments": [
-                    {
-                        "color": "#0879d1" if status_text == "Approved" else "#e97821" if status_text == "Changes requested" else "#138a69",
-                        "title": f"[{status_text.upper()}] {title} ({doc_id})",
-                        "title_link": f"http://127.0.0.1:8765/#workspace?id={doc_id}",
-                        "text": f"*{actor}*: {message}",
-                        "fields": [
-                            {"title": "Review State", "value": status_text, "short": True},
-                            {"title": "Platform", "value": "BrandWise Governance", "short": True}
-                        ],
-                        "footer": "BrandWise Pre-Publication Governance · Notification Engine",
-                        "ts": int(datetime.now(timezone.utc).timestamp())
-                    }
-                ]
-            }
-            webhook = os.environ.get('SLACK_WEBHOOK_URL', '').strip()
-            if not webhook:
-                return self.send_json(503, {'sent': False, 'error': 'Configure SLACK_WEBHOOK_URL locally before sending notifications.'})
-            if not webhook.startswith('https://hooks.slack.com/services/'):
-                return self.send_json(400, {'sent': False, 'error': 'Invalid Slack webhook URL'})
-            try:
-                request = urllib.request.Request(webhook, data=json.dumps(slack_payload).encode(), headers={'Content-Type':'application/json'})
-                with urllib.request.urlopen(request, timeout=10) as response:
-                    delivered = response.status == 200 and response.read().strip() == b'ok'
-                return self.send_json(200 if delivered else 502, {'sent': delivered})
-            except Exception:
-                return self.send_json(502, {'sent': False, 'error': 'Slack delivery failed. Check webhook configuration and retry.'})
-
-        # 6. API Keys Configuration & Management
+        # 5. API Keys Configuration & Management
         if path == '/api/keys':
             updates = {}
             if 'anthropicApiKey' in data: updates['ANTHROPIC_API_KEY'] = data['anthropicApiKey']
             if 'geminiApiKey' in data: updates['GEMINI_API_KEY'] = data['geminiApiKey']
             if 'openaiApiKey' in data: updates['OPENAI_API_KEY'] = data['openaiApiKey']
-            if 'slackWebhookUrl' in data: updates['SLACK_WEBHOOK_URL'] = data['slackWebhookUrl']
             saved = save_env_keys(updates)
             return self.send_json(200 if saved else 500, {'success': saved, 'message': 'API keys updated and saved to .env', 'keys': get_masked_keys()})
 
@@ -1595,6 +1639,19 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def init_storage():
+    if database.uses_postgres():
+        database.initialize()
+        imported_accounts = accounts.migrate_local_accounts()
+        datasets = (
+            (DB, DEFAULT_AUDITS),
+            (CLAIMS_DB, DEFAULT_CLAIMS),
+            (GUIDELINES_DB, DEFAULT_GUIDELINES),
+            (AUDIT_PREFERENCES_DB, DEFAULT_AUDIT_PREFERENCES),
+        )
+        for path, fallback in datasets:
+            database.get_json(path.name, fallback, path)
+        print(f'PostgreSQL storage ready; imported {imported_accounts} local account record(s) when the database was empty.')
+        return
     if not DB.exists():
         save_json(DB, DEFAULT_AUDITS)
     if not CLAIMS_DB.exists():

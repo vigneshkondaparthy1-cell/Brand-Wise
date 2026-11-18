@@ -8,3 +8,4 @@ insights-data.json
 __pycache__/
 *.py[cod]
 evaluation/__pycache__/
+.neon

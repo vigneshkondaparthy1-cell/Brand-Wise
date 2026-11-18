@@ -4,6 +4,7 @@ from hashlib import pbkdf2_hmac, sha256
 from hmac import compare_digest, new as hmac_new
 from http.cookies import SimpleCookie, CookieError
 from pathlib import Path
+import json
 import os
 import re
 import secrets
@@ -11,6 +12,14 @@ import smtplib
 import ssl
 import sqlite3
 import time
+import urllib.error
+import urllib.request
+import database
+
+try:
+    import psycopg
+except ImportError:  # SQLite-only local installs can run without the optional driver.
+    psycopg = None
 
 DB = Path(__file__).with_name('accounts.sqlite3')
 ROLES = {
@@ -29,6 +38,8 @@ class EmailDeliveryError(ValueError):
     pass
 
 def connect():
+    if database.uses_postgres():
+        return database.connect()
     db = sqlite3.connect(DB)
     db.row_factory = sqlite3.Row
     db.executescript("""
@@ -51,6 +62,10 @@ def connect():
       send_window INTEGER NOT NULL,
       sends_in_window INTEGER NOT NULL DEFAULT 1
     );
+    CREATE TABLE IF NOT EXISTS login_failures (
+      ip TEXT NOT NULL,
+      attempted_at INTEGER NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS password_resets (
       email TEXT PRIMARY KEY COLLATE NOCASE,
       code_hash BLOB NOT NULL,
@@ -64,6 +79,66 @@ def connect():
     """)
     return db
 
+# Retained for compatibility with audit tooling; sign-in no longer enforces a timed lockout.
+LOGIN_WINDOW_SECONDS = 900
+LOGIN_MAX_FAILURES = 5
+
+def login_is_limited(client_ip):
+    now = int(time.time())
+    cutoff = now - LOGIN_WINDOW_SECONDS
+    try:
+        with closing(connect()) as db, db:
+            db.execute("DELETE FROM login_failures WHERE attempted_at < ?", (cutoff,))
+            row = db.execute("SELECT COUNT(*) AS total FROM login_failures WHERE ip = ? AND attempted_at >= ?", (client_ip, cutoff)).fetchone()
+            total = row['total'] if row else 0
+            return total >= LOGIN_MAX_FAILURES
+    except Exception:
+        return False
+
+def record_login_failure(client_ip):
+    now = int(time.time())
+    try:
+        with closing(connect()) as db, db:
+            db.execute("INSERT INTO login_failures (ip, attempted_at) VALUES (?, ?)", (client_ip, now))
+    except Exception:
+        pass
+
+def clear_login_failures(client_ip):
+    try:
+        with closing(connect()) as db, db:
+            db.execute("DELETE FROM login_failures WHERE ip = ?", (client_ip,))
+    except Exception:
+        pass
+
+def migrate_local_accounts():
+    """Copy local account records to a new Neon database without copying sessions or OTPs."""
+    if not database.uses_postgres() or not DB.exists():
+        return 0
+    with closing(sqlite3.connect(DB)) as local:
+        local.row_factory = sqlite3.Row
+        rows = local.execute(
+            "SELECT username, email, name, role, organization, work, responsibilities, salt, password_hash FROM accounts"
+        ).fetchall()
+    if not rows:
+        return 0
+    with closing(database.connect()) as remote, remote:
+        count = remote.execute("SELECT count(*) AS total FROM accounts").fetchone()["total"]
+        if count:
+            return 0
+        for row in rows:
+            remote.execute(
+                "INSERT INTO accounts (username, email, name, role, organization, work, responsibilities, salt, password_hash) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
+                tuple(row),
+            )
+        return len(rows)
+
+
+def _is_integrity_error(exc):
+    return isinstance(exc, sqlite3.IntegrityError) or bool(
+        psycopg and isinstance(exc, psycopg.IntegrityError)
+    )
+
 def digest(password, salt):
     return pbkdf2_hmac('sha256', password.encode(), salt, 600000)
 
@@ -75,48 +150,120 @@ def normalize_email(value):
         raise ValueError('Enter a valid email address.')
     return email
 
+def is_local_dev():
+    if os.environ.get('RENDER'):
+        return False
+    env = os.environ.get('BRANDWISE_ENV', '').strip().lower()
+    if env == 'production':
+        return False
+    return True
+
 def _send_otp_message(email, code, password_reset=False):
+    resend_api_key = os.environ.get('RESEND_API_KEY', '').strip()
+    resend_sender = os.environ.get('RESEND_FROM', '').strip()
+    subject = 'Reset your BrandWise password' if password_reset else 'Your BrandWise verification code'
+    purpose = 'password reset' if password_reset else 'email verification'
+    text_body = (
+        f'Your BrandWise password reset code is {code}.\n\n'
+        'Enter this code in the password reset form. It expires in 10 minutes. '
+        'If you did not request a password reset, you can ignore this email.'
+        if password_reset else
+        f'Your BrandWise email verification code is {code}.\n\n'
+        'This code expires in 10 minutes. If you did not request it, you can ignore this email.'
+    )
+    if resend_api_key and not resend_api_key.startswith('re_your_key'):
+        if not resend_sender:
+            if not is_local_dev():
+                raise EmailDeliveryError('Resend is selected, but RESEND_FROM is empty. Set it to a sender address permitted by your Resend account.')
+        else:
+            payload = json.dumps({
+                'from': resend_sender,
+                'to': [email],
+                'subject': subject,
+                'text': text_body,
+            }).encode('utf-8')
+            request = urllib.request.Request(
+                'https://api.resend.com/emails',
+                data=payload,
+                headers={
+                    'Authorization': f'Bearer {resend_api_key}',
+                    'Content-Type': 'application/json',
+                },
+                method='POST',
+            )
+            try:
+                with urllib.request.urlopen(request, timeout=20) as response:
+                    if 200 <= response.status < 300:
+                        return None
+            except urllib.error.HTTPError as exc:
+                if not is_local_dev():
+                    detail = ''
+                    try:
+                        response_data = json.loads(exc.read(4096).decode('utf-8', errors='replace'))
+                        detail = response_data.get('message', '') if isinstance(response_data, dict) else ''
+                    except (ValueError, UnicodeDecodeError):
+                        pass
+                    message = f'Resend could not send the {purpose} code (HTTP {exc.code}).'
+                    if detail:
+                        message += f' {detail[:240]}'
+                    raise EmailDeliveryError(message) from None
+            except (OSError, urllib.error.URLError, TimeoutError) as exc:
+                if not is_local_dev():
+                    raise EmailDeliveryError('Could not reach Resend to send the code. Check the network connection and Resend service status, then try again.') from exc
+
     host = os.environ.get('SMTP_HOST', '').strip()
     user = os.environ.get('SMTP_USER', '').strip()
     password = os.environ.get('SMTP_PASSWORD', '')
+    if host.casefold() == 'smtp.gmail.com':
+        # Google presents App Passwords in groups; whitespace is only visual.
+        password = ''.join(password.split())
     sender = os.environ.get('SMTP_FROM', '').strip() or user
     try:
         port = int(os.environ.get('SMTP_PORT', '587'))
     except ValueError:
-        raise EmailDeliveryError('Email delivery is not configured. Check the SMTP settings in .env.') from None
-    if not host or not sender or not user or not password:
-        raise EmailDeliveryError('Email delivery is not configured. Add SMTP settings in .env before requesting a code.')
+        port = 587
 
-    message = EmailMessage()
-    message['Subject'] = 'Reset your BrandWise password' if password_reset else 'Your BrandWise verification code'
-    message['From'] = sender
-    message['To'] = email
-    if password_reset:
-        message.set_content(
-            f'Your BrandWise password reset code is {code}.\n\n'
-            'Enter this code in the password reset form. It expires in 10 minutes. '
-            'If you did not request a password reset, you can ignore this email.'
-        )
-    else:
-        message.set_content(
-            f'Your BrandWise email verification code is {code}.\n\n'
-            f'This code expires in 10 minutes. If you did not request it, you can ignore this email.'
-        )
-    try:
-        context = ssl.create_default_context()
-        if port == 465:
-            with smtplib.SMTP_SSL(host, port, timeout=15, context=context) as client:
-                client.login(user, password)
-                client.send_message(message)
-        else:
-            with smtplib.SMTP(host, port, timeout=15) as client:
-                client.ehlo()
-                client.starttls(context=context)
-                client.ehlo()
-                client.login(user, password)
-                client.send_message(message)
-    except (OSError, smtplib.SMTPException) as exc:
-        raise EmailDeliveryError('We could not send the code. Check the SMTP settings in .env and try again.') from exc
+    smtp_configured = bool(host and sender and user and password)
+    gmail_invalid_pwd = bool(host.casefold() == 'smtp.gmail.com' and len(password) != 16)
+
+    if smtp_configured and not gmail_invalid_pwd:
+        message = EmailMessage()
+        message['Subject'] = subject
+        message['From'] = sender
+        message['To'] = email
+        message.set_content(text_body)
+        try:
+            context = ssl.create_default_context()
+            if port == 465:
+                with smtplib.SMTP_SSL(host, port, timeout=15, context=context) as client:
+                    client.login(user, password)
+                    client.send_message(message)
+            else:
+                with smtplib.SMTP(host, port, timeout=15) as client:
+                    client.ehlo()
+                    client.starttls(context=context)
+                    client.ehlo()
+                    client.login(user, password)
+                    client.send_message(message)
+            return None
+        except smtplib.SMTPAuthenticationError as exc:
+            if not is_local_dev():
+                raise EmailDeliveryError('Gmail rejected SMTP sign-in. Check the App Password, or configure RESEND_API_KEY and RESEND_FROM in .env to send without Gmail SMTP.') from exc
+        except (OSError, smtplib.SMTPException) as exc:
+            if not is_local_dev():
+                raise EmailDeliveryError('We could not send the code. Check the SMTP settings in your hosting environment and try again.') from exc
+
+    # In local development, gracefully fall back to local dev verification code
+    if is_local_dev():
+        print(f"\n=======================================================", flush=True)
+        print(f"[BrandWise Local OTP] Email: {email}", flush=True)
+        print(f"[BrandWise Local OTP] Code:  {code}", flush=True)
+        print(f"=======================================================\n", flush=True)
+        return code
+
+    if host.casefold() == 'smtp.gmail.com' and len(password) != 16:
+        raise EmailDeliveryError('Gmail SMTP requires a 16-character Google App Password in SMTP_PASSWORD, not your regular Gmail password. Create one with 2-Step Verification enabled.')
+    raise EmailDeliveryError('Email delivery is not configured. To avoid Gmail 2-Step Verification, set RESEND_API_KEY and RESEND_FROM in .env; otherwise configure all SMTP settings.')
 
 def send_email_otp(raw_email):
     email = normalize_email(raw_email)
@@ -143,7 +290,8 @@ def send_email_otp(raw_email):
                         send_window=excluded.send_window, sends_in_window=excluded.sends_in_window""",
                    (email, code_hash, salt, now + OTP_TTL, now, window, sends))
     try:
-        _send_otp_message(email, code)
+        dev_code = _send_otp_message(email, code)
+        return {'ok': True, 'dev_code': dev_code}
     except EmailDeliveryError:
         with closing(connect()) as db, db:
             db.execute('DELETE FROM email_verifications WHERE email = ? AND verified_until = 0', (email,))
@@ -197,12 +345,12 @@ def send_password_reset_otp(raw_email):
                         send_window=excluded.send_window, sends_in_window=excluded.sends_in_window""",
                    (email, code_hash, salt, now + OTP_TTL, now, window, sends))
     try:
-        _send_otp_message(email, code, password_reset=True)
+        dev_code = _send_otp_message(email, code, password_reset=True)
+        return {'ok': True, 'dev_code': dev_code}
     except EmailDeliveryError:
         with closing(connect()) as db, db:
             db.execute('DELETE FROM password_resets WHERE email = ?', (email,))
         raise
-    return True
 
 
 def reset_password_with_email_otp(raw_email, code, new_password):
@@ -262,15 +410,21 @@ def register(data):
             db.execute('INSERT INTO accounts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
                        (username, email, name, role, organization, work, responsibilities, salt, digest(password, salt)))
             db.execute('DELETE FROM email_verifications WHERE email = ?', (email,))
-    except sqlite3.IntegrityError:
-        raise ValueError('That username or email is already registered.') from None
+    except Exception as exc:
+        if _is_integrity_error(exc):
+            raise ValueError('That username or email is already registered.') from None
+        raise
 
 def login(data):
-    username, password = data.get('username'), data.get('password')
-    if not isinstance(username, str) or not isinstance(password, str) or len(username) > 32 or len(password) > 128:
+    identifier, password = data.get('username'), data.get('password')
+    if not isinstance(identifier, str) or not isinstance(password, str) or len(identifier) > 254 or len(password) > 128:
         return None
     with closing(connect()) as db, db:
-        row = db.execute('SELECT * FROM accounts WHERE username = ?', (username.strip(),)).fetchone()
+        identifier = identifier.strip()
+        row = db.execute(
+            'SELECT * FROM accounts WHERE lower(username) = lower(?) OR lower(email) = lower(?)',
+            (identifier, identifier),
+        ).fetchone()
         hashed = digest(password, row['salt'] if row else bytes(16))
         if not row or not compare_digest(hashed, row['password_hash']):
             return None
@@ -302,7 +456,7 @@ def list_users():
     """Return non-secret profile/work fields for the admin team overview."""
     with closing(connect()) as db:
         rows = db.execute("""SELECT username, email, name, role, organization, work, responsibilities
-                            FROM accounts ORDER BY role COLLATE NOCASE, name COLLATE NOCASE""").fetchall()
+                            FROM accounts ORDER BY lower(role), lower(name)""").fetchall()
     return [dict(row) for row in rows]
 
 def logout(headers):
@@ -344,8 +498,10 @@ def update_profile(headers, data):
             db.execute('UPDATE sessions SET username=? WHERE username=?', (username, user['username']))
             if email_changed:
                 db.execute('DELETE FROM email_verifications WHERE email = ?', (email,))
-    except sqlite3.IntegrityError:
-        raise ValueError('That username or email is already in use.') from None
+    except Exception as exc:
+        if _is_integrity_error(exc):
+            raise ValueError('That username or email is already in use.') from None
+        raise
     return current_user(headers)
 
 def change_password(headers, current_password, new_password):
