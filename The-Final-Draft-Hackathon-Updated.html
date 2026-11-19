@@ -1157,6 +1157,7 @@ html:not([data-signed-in]) body {
 }
 #authPageHeader > * { pointer-events: auto; }
 #authPageHeader .auth-brand-name { color: #1677c8; font: 800 clamp(22px, 2vw, 30px)/1 'Inter', sans-serif; letter-spacing: .12em; user-select: none; }
+#authPageHeader .auth-overview-link { margin-left: auto; margin-right: clamp(16px, 3vw, 38px); }
 #authPageHeader .auth-theme-control { display: flex; align-items: center; gap: 10px; color: #64748b; font-size: 16px; font-weight: 700; }
 #authPageHeader #authTheme { width: auto; min-width: 112px; margin: 0; padding: 9px 32px 9px 13px; font-size: 15px; }
 :root[data-theme="dark"] #authPageHeader { border-color: #45556b; background: #172231eF; box-shadow: 0 8px 28px #05080c55; }
@@ -1260,7 +1261,9 @@ html[data-theme="dark"] .delete-account-confirmation { background:color-mix(in s
 .asset-empty-icon { display:grid; place-items:center; width:48px; height:48px; margin:0 auto 10px; border-radius:14px; background:var(--blue-light); color:var(--blue-text,var(--blue)); font-size:25px; }
 .asset-empty-state p { max-width:540px; margin:5px auto 14px; color:var(--text-muted); }
 .asset-storage-note { margin:8px 0 0; color:var(--text-muted); font-size:11px; }
-.calendar-layout { display:grid; grid-template-columns:minmax(0,1fr); gap:16px; }
+.calendar-layout { display:grid; grid-template-columns:minmax(300px,.8fr) minmax(0,1.8fr); align-items:start; gap:16px; }
+.calendar-sidebar { min-width:0; display:grid; align-content:start; gap:16px; }
+.calendar-sidebar .calendar-upcoming { margin-top:0; }
 .calendar-board.white-panel { min-width:0; padding:0; overflow:hidden; }
 .calendar-month-heading, .calendar-controls, .calendar-filters { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
 .calendar-month-heading { justify-content:space-between; padding:18px; }
@@ -1290,7 +1293,6 @@ html[data-theme="dark"] .delete-account-confirmation { background:color-mix(in s
 .calendar-chip-time { white-space:nowrap; font-size:10px; }
 .calendar-more { font-size:11px; font-weight:700; color:var(--blue-text,var(--blue)); }
 .calendar-board > .calendar-notice { border-top:1px solid var(--line); margin:0; padding:12px 18px; }
-.calendar-detail-layout { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; gap:16px; }
 .calendar-notice { margin:12px 0 0; color:var(--text-muted); font-size:11px; }
 .calendar-event-form-panel h2, .calendar-list-heading h2 { margin:0 0 4px; color:var(--navy); font-size:18px; }
 .calendar-event-form-panel > p, .calendar-list-heading p { margin:0 0 14px; color:var(--text-muted); font-size:12px; }
@@ -1309,7 +1311,8 @@ html[data-theme="dark"] .delete-account-confirmation { background:color-mix(in s
 .calendar-event-detail { margin-top:3px; color:var(--text-muted); font-size:11px; }
 .calendar-event-empty { padding:18px; border:1px dashed var(--line-strong); border-radius:12px; color:var(--text-muted); text-align:center; font-size:12px; }
 .optional-label { color:var(--text-muted); font-weight:400; }
-@media (max-width: 950px) { .brand-asset-toolbar { grid-template-columns:repeat(2,minmax(0,1fr)); } .calendar-detail-layout { grid-template-columns:minmax(0,1fr); } }
+@media (max-width: 1100px) { .calendar-layout { grid-template-columns:minmax(0,1fr); } }
+@media (max-width: 950px) { .brand-asset-toolbar { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media (max-width: 600px) { .brand-asset-toolbar { grid-template-columns:1fr; } .calendar-event-row { grid-template-columns:64px minmax(0,1fr); } .calendar-event-row > :last-child { grid-column:2; } }
 /* Make the audit lifecycle actions easy to see and tap. */
 #governanceActionButtons { display:flex; align-items:center; gap:8px !important; flex-wrap:wrap; }
@@ -1427,19 +1430,61 @@ html[data-signed-in] #authSignInStage, html[data-signed-in] #authOverview,
   box-shadow: var(--shadow-subtle);
 }
 #authAuditPreview, #authFeatureSummary { scroll-margin-top: 94px; }
-.auth-demo { overflow: hidden; }
-#authDemoTitle { font-size: 21px; line-height: 1.3; }
-.auth-demo-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 16px 22px; border-bottom: 1px solid var(--line); }
-.auth-demo-grid { display: grid; grid-template-columns: 3fr 2fr; }
-.auth-demo-panel { min-width: 0; padding: clamp(16px,3vw,28px); }
+.auth-demo { overflow: hidden; color: var(--text); background: var(--card-bg); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow-card); }
+#authDemoTitle { font-size: 16px; line-height: 1.3; color: var(--navy); }
+.auth-demo-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 16px 22px; border-bottom: 1px solid var(--line); background: var(--card-elevated); }
+.review-desk-title { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.review-desk-kind { border-radius: 5px; padding: 4px 8px; background: var(--blue-light); color: var(--blue-text,var(--blue)); font-size: 11px; font-weight: 750; }
+.review-desk-apply { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line); border-radius: 8px; padding: 9px 13px; color: var(--blue-text,var(--blue)); background: var(--card-bg); font-size: 12px; font-weight: 750; }
+.review-desk-apply:hover { background: var(--blue-light); }
+.auth-demo-grid { display: grid; grid-template-columns: 1.65fr 1fr; }
+.auth-demo-panel { min-width: 0; padding: clamp(18px,2.2vw,30px); }
 .auth-demo-panel + .auth-demo-panel { background: var(--card-elevated); border-inline-start: 1px solid var(--line); }
-.auth-demo-panel h3 { margin-bottom: 8px; font-size: 24px; }
-.auth-demo-copy { margin: 0 0 14px; padding: 16px; font-size: 1rem; border: 1px solid var(--line); border-radius: var(--radius-sm); }
-.auth-demo-copy mark { background: var(--orange-light); color: var(--text); font-weight: 700; }
-.auth-demo-result { padding: 14px; border-inline-start: 3px solid var(--orange); border-radius: var(--radius-sm); background: var(--card-bg); font-size: 14px; }
-.auth-demo-result[data-revised] { border-inline-start-color: var(--green); }
+.review-desk-meta, .review-desk-subhead, .review-desk-legend, .review-desk-score-head, .review-desk-stat { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; }
+.review-desk-subhead { justify-content: space-between; margin-bottom: 14px; }
+.review-desk-subhead h4, .review-desk-score-head h4 { margin: 0; color: var(--text-muted); font-size: 11px; font-weight: 850; letter-spacing: .075em; text-transform: uppercase; }
+.review-desk-flag, .review-desk-pill { display: inline-flex; align-items: center; gap: 6px; border-radius: 99px; padding: 5px 9px; background: var(--amber-light); color: #986319; font-size: 11px; font-weight: 750; }
+.review-desk-flag::before, .review-desk-dot { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; background: #e58a1b; content: ''; }
+.review-desk-legend { justify-content: flex-end; color: var(--text-muted); font-size: 11px; }
+.review-desk-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.review-desk-legend .review-desk-dot.red { background: #d85355; }
+.auth-demo-copy { margin: 0; padding: 22px; white-space: pre-wrap; outline: none; color: var(--text); background: var(--card-bg); border: 1px solid var(--line); border-radius: 14px; font-size: clamp(14px,1.2vw,16px); line-height: 1.75; }
+.auth-demo-copy mark { padding: 2px 5px; border-radius: 4px; color: #a65e13; background: #fff0d7; font-weight: 750; }
+.auth-demo-copy mark.claim { color: #b7353c; background: #fce6e6; }
+.review-desk-meta { justify-content: space-between; padding-top: 16px; color: #82796b; font-size: 11px; }
+.review-desk-pills { display: flex; flex-wrap: wrap; gap: 7px; }
+.review-desk-pill.good { color: #497450; background: #e4f0df; }
+.review-desk-pill.pending { color: #96631d; background: #fff0d8; }
+.review-desk-score { padding: 18px; border: 1px solid var(--line); border-radius: 13px; background: var(--blue-light); }
+.review-desk-score-head { justify-content: space-between; }
+.review-desk-score-head span { color: #a85a14; background: var(--orange-light); border-radius: 5px; padding: 5px 8px; font-size: 10px; font-weight: 850; }
+.review-desk-score-line { display: flex; align-items: baseline; gap: 5px; margin: 7px 0 10px; color: var(--navy); }
+.review-desk-score-line strong { font-size: 32px; line-height: 1; }
+.review-desk-score-line small { color: var(--text-muted); font-size: 13px; font-weight: 700; }
+.review-desk-progress { height: 6px; overflow: hidden; border-radius: 99px; background: #d2e2f2; }
+.review-desk-progress span { display: block; width: 84%; height: 100%; border-radius: inherit; background: #e58a1b; transition: width .25s ease; }
+.review-desk-score p { margin: 8px 0 0; color: var(--text-muted); font-size: 11px; }
+.review-desk-breakdown { margin-top: 20px; }
+.review-desk-breakdown h4 { margin: 0 0 8px; color: #786f61; font-size: 11px; font-weight: 850; letter-spacing: .075em; text-transform: uppercase; }
+.review-desk-stat { justify-content: space-between; padding: 9px 0; border-bottom: 1px dashed var(--line); color: var(--text-muted); font-size: 12px; }
+.review-desk-stat strong { color: #438459; }
+.review-desk-stat strong.mid { color: #bf7b22; }
+.review-desk-stat strong.low { color: #c74e50; }
+.review-desk-open { display: block; width: 100%; margin-top: 18px; border: 0; border-radius: 8px; padding: 13px 16px; color: #fff; background: var(--blue); font-size: 12px; font-weight: 800; text-align: center; text-decoration: none; }
+.review-desk-open:hover { background: var(--blue-hover); }
+.review-desk-status { min-height: 18px; margin-top: 9px; color: #527754; font-size: 11px; }
+:root[data-theme="dark"] .auth-demo { color: var(--text); background: var(--card-bg); border-color: var(--line); }
+:root[data-theme="dark"] .auth-demo-header, :root[data-theme="dark"] .auth-demo-panel + .auth-demo-panel { background: var(--card-elevated); border-color: var(--line); }
+:root[data-theme="dark"] #authDemoTitle, :root[data-theme="dark"] .review-desk-score-line { color: var(--navy); }
+:root[data-theme="dark"] .review-desk-kind { background: #20364e; color: #9bd4ff; }
+:root[data-theme="dark"] .review-desk-flag, :root[data-theme="dark"] .review-desk-pill.pending { background: #3b3020; color: #ffd08b; }
+:root[data-theme="dark"] .review-desk-apply, :root[data-theme="dark"] .auth-demo-copy { color: var(--text); background: var(--card-bg); border-color: var(--line); }
+:root[data-theme="dark"] .review-desk-apply:hover { background: var(--blue-light); }
+:root[data-theme="dark"] .review-desk-score { background: #172c43; border-color: var(--line); }
+:root[data-theme="dark"] .review-desk-progress { background: #2c4158; }
+.auth-demo-result { display: none; }
 .auth-demo-result p { margin-top: 6px; }
-.auth-feature-heading { margin: 48px 0 18px; text-align: center; font-size: clamp(30px,5vw,46px); }
+.auth-feature-heading { margin: 48px 0 18px; text-align: center; font-size: clamp(30px,5vw,46px); word-spacing: .18em; }
 .auth-overview-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 14px; }
 .auth-overview-card { padding: 20px; }
 .auth-overview-card h3 { margin-bottom: 8px; font-size: 24px; }
@@ -1461,6 +1506,7 @@ html[data-signed-in] #authSignInStage, html[data-signed-in] #authOverview,
   #authPageHeader { padding-inline: 12px; gap: 8px; }
   #authPageHeader .auth-brand-name { font-size: 17px; }
   #authPageHeader .auth-overview-link { font-size: 12px; }
+  #authPageHeader .auth-overview-link { margin-right: 10px; }
   #authPageHeader .auth-theme-control span { display: none; }
   #authPageHeader #authTheme { min-width: 0; padding-inline: 6px; }
 }
@@ -1470,7 +1516,7 @@ html[data-signed-in] #authSignInStage, html[data-signed-in] #authOverview,
 <header id="authPageHeader">
   <span class="auth-brand-name">BRANDWISE</span>
   <a class="auth-overview-link" href="#accountGate">Sign in</a>
-  <label class="auth-theme-control" for="authTheme"><span>Theme</span>
+    <label class="auth-theme-control" for="authTheme"><span>Theme</span>
     <select id="authTheme" aria-label="Choose light or dark theme"><option value="light">Light</option><option value="dark">Dark</option></select>
   </label>
 </header>
@@ -1495,6 +1541,18 @@ html[data-signed-in] #authSignInStage, html[data-signed-in] #authOverview,
     <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg></span>
     <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg></span>
     <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="2"/><path d="M15.5 8.5 21 3M17 3h4v4"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5h16v14zM7 15l4-4 3 3 3-5M7 8h1"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h6v6H4zM14 14h6v6h-6zM7 10v7h7M14 7h6M17 4v6"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4v5c0 4-3 7-8 9-5-2-8-5-8-9V7zM8 12l3 3 5-6"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4H5v17h14V4h-3M9 3h6v4H9zM8 12l2 2 5-4M8 18h7"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4M12 15v2"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17a4 4 0 0 1 0-8 6 6 0 0 1 12-2 5 5 0 0 1 3 10M9 17l3 3 5-5"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10v5h4l3 6h3l-3-7 10 4V4L7 10zM7 10v5"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="4"/><path d="M4 21v-2a6 6 0 0 1 12 0v2"/></svg></span>
   </div>
   <div class="auth-overview-wrap">
     <div class="auth-overview-intro">
@@ -1508,21 +1566,40 @@ html[data-signed-in] #authSignInStage, html[data-signed-in] #authOverview,
     </div>
     <section class="auth-demo" id="authAuditPreview" aria-labelledby="authDemoTitle">
       <header class="auth-demo-header">
-        <h3 id="authDemoTitle">Audit Workspace preview</h3>
-        <span class="pill-tag pill-blue">Sample audit</span>
+        <div class="review-desk-title">
+          <h3 id="authDemoTitle">▤ &nbsp;Northstar Studio · Modular Lighting Launch</h3>
+          <span class="review-desk-kind">Product Campaign · v2.1</span>
+        </div>
+        <button class="review-desk-apply" id="authDemoToggle" type="button" aria-pressed="false">↻ &nbsp;Apply Guideline Rules</button>
       </header>
       <div class="auth-demo-grid">
-        <div class="auth-demo-panel">
-          <h3>Product page draft</h3>
-          <blockquote class="auth-demo-copy" id="authDemoCopy">Our product <mark>guarantees 10× faster onboarding</mark> for every team.</blockquote>
-          <button class="btn-pill-primary" id="authDemoToggle" type="button">Preview suggested edit</button>
-        </div>
-        <div class="auth-demo-panel">
-          <h3>Audit report</h3>
-          <div class="auth-demo-result" id="authDemoResult" aria-live="polite">
-            <strong>Unsupported performance claim</strong>
-            <p>The guarantee needs approved evidence. Remove the numeric promise if it cannot be substantiated.</p>
+        <div class="auth-demo-panel review-desk-draft">
+          <div class="review-desk-subhead">
+            <div class="review-desk-meta"><h4>Launch copy draft</h4><span class="review-desk-flag"><span id="authDemoFlagCount">2</span> issues flagged</span></div>
+            <div class="review-desk-legend"><span><i class="review-desk-dot"></i>Unsubstantiated superlative</span><span><i class="review-desk-dot red"></i>Unverified materials claim</span></div>
           </div>
+          <blockquote class="auth-demo-copy" id="authDemoCopy" aria-label="Example draft copy specimen">Northstar Studio creates modular lighting for calm, considered spaces. Our new collection delivers <mark>groundbreaking</mark> performance in every room. Each fixture is made with <mark class="claim">carbon-neutral</mark> materials and designed to bring lasting warmth to everyday routines.</blockquote>
+          <div class="review-desk-meta">
+            <span>Length: <span id="authDemoWordCount">34</span> words &nbsp;·&nbsp; Reading time: <span id="authDemoReadTime">9</span> sec &nbsp;·&nbsp; Target tone: Clear &amp; Considered</span>
+            <div class="review-desk-pills"><span class="review-desk-pill good">Tone: 96% Consistent</span><span class="review-desk-pill pending" id="authDemoPending">2 Flags Pending</span></div>
+          </div>
+        </div>
+        <div class="auth-demo-panel review-desk-evaluation">
+          <div class="review-desk-score">
+            <div class="review-desk-score-head"><h4>Brand integrity score</h4><span id="authDemoAction">Action required</span></div>
+            <div class="review-desk-score-line"><strong id="authDemoScore">81</strong><small>/100</small></div>
+            <div class="review-desk-progress"><span id="authDemoProgress"></span></div>
+            <p id="authDemoScoreNote">2 claims need evidence or revised wording before publishing.</p>
+          </div>
+          <div class="review-desk-breakdown">
+            <h4>Evaluation breakdown</h4>
+            <div class="review-desk-stat"><span>Voice &amp; Tone Alignment</span><strong>98%</strong></div>
+            <div class="review-desk-stat"><span>Approved Language</span><strong class="mid" id="authDemoLexicon">78%</strong></div>
+            <div class="review-desk-stat"><span>Materials Claim Evidence</span><strong class="low" id="authDemoEsg">62%</strong></div>
+            <div class="review-desk-stat"><span>Visual Identity Match</span><strong>100%</strong></div>
+          </div>
+          <a class="review-desk-open" href="#accountGate">Open Northstar Review Desk &nbsp;›</a>
+          <p class="review-desk-status" id="authDemoResult" role="status" aria-live="polite"></p>
         </div>
       </div>
     </section>
@@ -1559,12 +1636,18 @@ html[data-signed-in] #authSignInStage, html[data-signed-in] #authOverview,
     <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg></span>
     <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg></span>
     <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></span>
-    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V3h12l4 4v14zM15 3v5h5M8 12h8M8 16h5"/></svg></span>
-    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
-    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="15" width="6" height="6" rx="1"/><path d="M6 9v6a3 3 0 0 0 3 3h6"/></svg></span>
-    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></span>
-    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></span>
-    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><path d="m9 14 2 2 4-4"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="2"/><path d="M15.5 8.5 21 3M17 3h4v4"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5h16v14zM7 15l4-4 3 3 3-5M7 8h1"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h6v6H4zM14 14h6v6h-6zM7 10v7h7M14 7h6M17 4v6"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4v5c0 4-3 7-8 9-5-2-8-5-8-9V7zM8 12l3 3 5-6"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4H5v17h14V4h-3M9 3h6v4H9zM8 12l2 2 5-4M8 18h7"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4M12 15v2"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17a4 4 0 0 1 0-8 6 6 0 0 1 12-2 5 5 0 0 1 3 10M9 17l3 3 5-5"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10v5h4l3 6h3l-3-7 10 4V4L7 10zM7 10v5"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="4"/><path d="M4 21v-2a6 6 0 0 1 12 0v2"/></svg></span>
   </div>
 <section id="accountGate" class="white-panel" aria-labelledby="accountTitle" tabindex="-1">
   <div class="auth-sky" aria-hidden="true">
@@ -1844,6 +1927,26 @@ html[data-signed-in] #authSignInStage, html[data-signed-in] #authOverview,
       <button class="btn-pill-ghost" id="enableCalendarNotifications" type="button">Allow notifications</button>
     </div>
     <div class="calendar-layout">
+      <aside class="calendar-sidebar">
+        <section class="white-panel calendar-event-form-panel">
+          <h2>Add a reminder</h2>
+          <p>Schedule a task, meeting, or review checkpoint.</p>
+          <form id="calendarEventForm">
+            <label>Title<input id="calendarEventTitle" required maxlength="100" placeholder="e.g. Review launch campaign"></label>
+            <label>Type<select id="calendarEventType"><option>Task</option><option>Meeting</option><option>Review</option><option>Reminder</option></select></label>
+            <div class="calendar-date-row"><label>Date<input id="calendarEventDate" type="date" required></label><label>Time<input id="calendarEventTime" type="time" required></label></div>
+            <label>Notes <span class="optional-label">(optional)</span><textarea id="calendarEventNotes" rows="3" maxlength="300" placeholder="Agenda, link, or details"></textarea></label>
+            <label class="calendar-notify-toggle"><input id="calendarEventNotify" type="checkbox" checked><span>Notify me at this time</span></label>
+            <button class="btn-pill-primary" type="submit">Save reminder</button>
+            <p id="calendarFormStatus" class="calendar-notice" role="status" aria-live="polite"></p>
+          </form>
+        </section>
+        <section class="white-panel calendar-selected-day">
+          <div class="calendar-list-heading"><h2 id="calendarDayLabel">Selected day</h2></div>
+          <div id="calendarDayEvents" class="calendar-upcoming-list"></div>
+        </section>
+        <section class="white-panel calendar-upcoming"><div class="calendar-list-heading"><div><h2>Upcoming</h2><p>Your next scheduled tasks and meetings.</p></div><span class="pill-tag pill-blue" id="calendarUpcomingCount">0 ITEMS</span></div><div id="calendarUpcomingList" class="calendar-upcoming-list"></div></section>
+      </aside>
       <section class="white-panel calendar-board">
         <div class="calendar-month-heading">
           <div><h2 id="calendarMonthLabel"></h2><div class="calendar-range" id="calendarMonthRange"></div></div>
@@ -1871,27 +1974,7 @@ html[data-signed-in] #authSignInStage, html[data-signed-in] #authOverview,
         </div>
         <p class="calendar-notice" id="calendarNotificationStatus" role="status" aria-live="polite">Reminders appear here while the app is open. Browser notifications need permission.</p>
       </section>
-      <div class="calendar-detail-layout">
-      <aside class="white-panel calendar-event-form-panel">
-        <h2>Add a reminder</h2>
-        <p>Schedule a task, meeting, or review checkpoint.</p>
-        <form id="calendarEventForm">
-          <label>Title<input id="calendarEventTitle" required maxlength="100" placeholder="e.g. Review launch campaign"></label>
-          <label>Type<select id="calendarEventType"><option>Task</option><option>Meeting</option><option>Review</option><option>Reminder</option></select></label>
-          <div class="calendar-date-row"><label>Date<input id="calendarEventDate" type="date" required></label><label>Time<input id="calendarEventTime" type="time" required></label></div>
-          <label>Notes <span class="optional-label">(optional)</span><textarea id="calendarEventNotes" rows="3" maxlength="300" placeholder="Agenda, link, or details"></textarea></label>
-          <label class="calendar-notify-toggle"><input id="calendarEventNotify" type="checkbox" checked><span>Notify me at this time</span></label>
-          <button class="btn-pill-primary" type="submit">Save reminder</button>
-          <p id="calendarFormStatus" class="calendar-notice" role="status" aria-live="polite"></p>
-        </form>
-      </aside>
-      <section class="white-panel">
-        <div class="calendar-list-heading"><h2 id="calendarDayLabel">Selected day</h2></div>
-        <div id="calendarDayEvents" class="calendar-upcoming-list"></div>
-      </section>
-      </div>
     </div>
-    <section class="white-panel calendar-upcoming"><div class="calendar-list-heading"><div><h2>Upcoming</h2><p>Your next scheduled tasks and meetings.</p></div><span class="pill-tag pill-blue" id="calendarUpcomingCount">0 ITEMS</span></div><div id="calendarUpcomingList" class="calendar-upcoming-list"></div></section>
     <p class="asset-storage-note">Reminders are shared within the active workspace. Keep BrandWise open to receive scheduled notifications.</p>
   </main>
 
@@ -2226,8 +2309,8 @@ html[data-signed-in] #authSignInStage, html[data-signed-in] #authOverview,
         <p>Track past creative audits, monitor the compliance drift, and zap issues before campaigns launch to market.</p>
       </div>
       <div style="display:flex;gap:8px;align-items:center;">
-        <button class="btn-pill-ghost">📅 All time</button>
-        <button class="btn-pill-ghost">⇕ Sort</button>
+        <button class="btn-pill-ghost" id="historyRangeButton" type="button" aria-label="Change audit date range">📅 All time</button>
+        <button class="btn-pill-ghost" id="historySortButton" type="button" aria-label="Sort audit archive by date">⇕ Newest first</button>
         <button class="btn-pill-orange" id="btnHistoryAuditNow">+ Audit Now</button>
       </div>
     </div>
@@ -2623,8 +2706,7 @@ html[data-signed-in] #authSignInStage, html[data-signed-in] #authOverview,
             </div>
             <div style="font-size:16px;font-weight:800;color:var(--navy);margin:4px 0 8px;">v2.4 <span style="font-size:11px;font-weight:600;color:var(--text-dim);">Updated 2 days ago</span></div>
             <div style="display:flex;gap:6px;font-size:10px;">
-              <span class="pill-tag pill-gray">118 rules queued</span>
-              <span class="pill-tag pill-blue">Check Updates</span>
+              <button class="btn-pill-ghost" id="btnReviewGuidelines" type="button" style="padding:5px 10px;font-size:10px;">Review current rules</button>
             </div>
           </div>
         </div>
@@ -3556,6 +3638,7 @@ $('#subtab-ws-arch').onclick = () => openModal('#modalArch');
 $('#btnOpenDiffFromPanel').onclick = () => openModal('#modalDiff');
 $('#btnOpenWcagFromPanel').onclick = () => openModal('#modalWcag');
 $('#btnInspectStudio').onclick = () => openModal('#modalWcag');
+$('#btnReviewGuidelines').onclick = () => setTab('guidelines');
 
 // -------------------------------------------------------------------------
 // Guidelines Category Filter
@@ -4254,17 +4337,57 @@ function bindArchiveRowButtons() {
 bindArchiveRowButtons();
 
 // Archive Search Filter
+let historyRange = 'all';
+let historySort = 'newest';
+const historyRangeOptions = [
+  {key:'all',label:'All time'},
+  {key:'30d',label:'Last 30 days'},
+  {key:'90d',label:'Last 90 days'},
+  {key:'year',label:'This year'}
+];
+function updateHistoryControlLabels() {
+  const range = historyRangeOptions.find(option => option.key === historyRange) || historyRangeOptions[0];
+  $('#historyRangeButton').textContent = `📅 ${range.label}`;
+  $('#historySortButton').textContent = `⇕ ${historySort === 'newest' ? 'Newest first' : 'Oldest first'}`;
+}
 function filterAuditArchive() {
   const q = $('#archiveSearch').value.toLowerCase().trim();
   const from = $('#archiveDateFrom').value;
   const to = $('#archiveDateTo').value;
-  $$('#historyTableRows tr[data-audit-id]').forEach(row => {
+  const today = new Date();
+  const cutoff = new Date(today);
+  if (historyRange === '30d') cutoff.setDate(cutoff.getDate() - 30);
+  if (historyRange === '90d') cutoff.setDate(cutoff.getDate() - 90);
+  const rangeFrom = historyRange === 'year' ? `${today.getFullYear()}-01-01` : (historyRange === 'all' ? '' : cutoff.toISOString().slice(0,10));
+  const rows = $$('#historyTableRows tr[data-audit-id]');
+  rows.sort((a,b) => {
+    const order = (a.dataset.auditDate || '').localeCompare(b.dataset.auditDate || '');
+    return historySort === 'newest' ? -order : order;
+  }).forEach(row => $('#historyTableRows').appendChild(row));
+  let visibleCount = 0;
+  rows.forEach(row => {
     const date = row.dataset.auditDate || '';
     const matchesText = row.textContent.toLowerCase().includes(q);
-    const matchesDate = (!from || (date && date >= from)) && (!to || (date && date <= to));
-    row.style.display = matchesText && matchesDate ? '' : 'none';
+    const matchesDate = (!from || (date && date >= from)) && (!to || (date && date <= to)) && (!rangeFrom || (date && date >= rangeFrom));
+    const visible = matchesText && matchesDate;
+    row.style.display = visible ? '' : 'none';
+    if (visible) visibleCount += 1;
   });
+  const summary = $('#historyTableSummary');
+  if (summary) summary.textContent = `Showing ${visibleCount} of ${rows.length} saved audit${rows.length === 1 ? '' : 's'} · ${historyRangeOptions.find(option => option.key === historyRange)?.label || 'All time'} · ${historySort === 'newest' ? 'Newest first' : 'Oldest first'}`;
 }
+$('#historyRangeButton').onclick = () => {
+  const index = historyRangeOptions.findIndex(option => option.key === historyRange);
+  historyRange = historyRangeOptions[(index + 1) % historyRangeOptions.length].key;
+  updateHistoryControlLabels();
+  filterAuditArchive();
+};
+$('#historySortButton').onclick = () => {
+  historySort = historySort === 'newest' ? 'oldest' : 'newest';
+  updateHistoryControlLabels();
+  filterAuditArchive();
+};
+updateHistoryControlLabels();
 $('#archiveSearch').oninput = filterAuditArchive;
 $('#archiveDateFrom').onchange = filterAuditArchive;
 $('#archiveDateTo').onchange = filterAuditArchive;
@@ -4684,7 +4807,7 @@ function escapeHTML(str) {
 }
 
 
-// Scatter decorative icons in the open space around each section's content.
+// Scatter decorative icons in open space around each section's content.
 function arrangeAuthIcons() {
   const overview = document.getElementById('authOverview');
   const stage = document.getElementById('authSignInStage');
@@ -4701,12 +4824,9 @@ function arrangeAuthIcons() {
     );
     const panelBounds = [...panels].map(panel => panel.getBoundingClientRect());
     const size = parseFloat(getComputedStyle(layer.firstElementChild).width);
-    const clearance = 18;
-    const step = size + 48;
+    const clearance = 22;
     const topInset = section === overview ? header.getBoundingClientRect().height + 18 : 36;
     const bottomInset = section === overview ? 36 : 24;
-    const pairs = [];
-
     const clearsPanels = ({ x, y }) => !panelBounds.some(panel =>
       bounds.left + x < panel.right + clearance &&
       bounds.left + x + size > panel.left - clearance &&
@@ -4714,33 +4834,37 @@ function arrangeAuthIcons() {
       bounds.top + y + size > panel.top - clearance
     );
 
-    for (let row = 0, y = topInset; y + size + bottomInset <= bounds.height; row++, y += step) {
-      const inset = clearance + (row % 2) * Math.round(step / 4);
-      const lastLeft = (bounds.width - size - step) / 2;
-      for (let column = 0, x = inset; x <= lastLeft; column++, x += step) {
-        const offsetY = y + ((row + column) % 3) * 6;
-        const left = { x, y: offsetY };
-        const right = { x: bounds.width - size - x, y: offsetY + 7 };
-        if (right.y + size + bottomInset <= bounds.height && clearsPanels(left) && clearsPanels(right)) {
-          pairs.push([left, right]);
-        }
-      }
-    }
-
-    const pairCount = Math.min(Math.floor(layer.children.length / 2), pairs.length);
-    const slots = [];
-    for (let index = 0; index < pairCount; index++) {
-      slots.push(...pairs[Math.floor((index + 0.5) * pairs.length / pairCount)]);
-    }
-    const rotations = [-10, 9, 7, -8, -6, 6];
+    // Fixed, staggered side placements match the reference screenshots.
+    const overviewSlots = [
+      [.035,.105],[.17,.135],[.83,.12],[.965,.095],
+      [.075,.205],[.94,.225],[.025,.315],[.16,.345],[.84,.325],[.975,.355],
+      [.07,.435],[.93,.455],[.025,.545],[.17,.565],[.83,.535],[.975,.575],
+      [.07,.655],[.94,.675],[.025,.765],[.16,.785],[.84,.755],[.975,.795],
+      [.07,.875],[.93,.895],[.025,.955],[.17,.965],[.83,.945],[.975,.97]
+    ];
+    const signInSlots = [
+      [.035,.075],[.17,.11],[.83,.09],[.965,.07],
+      [.07,.22],[.94,.24],[.025,.36],[.17,.39],[.83,.35],[.975,.38],
+      [.07,.52],[.94,.54],[.025,.66],[.17,.69],[.83,.65],[.975,.68],
+      [.07,.82],[.94,.84],[.025,.94],[.17,.96],[.83,.92],[.975,.95],
+      [.27,.075],[.73,.075],[.27,.975],[.73,.975]
+    ];
+    const referenceSlots = section === overview ? overviewSlots : signInSlots;
     [...layer.children].forEach((icon, index) => {
-      const slot = slots[index];
+      const anchor = referenceSlots[index];
+      const point = anchor && {
+        x: Math.round(anchor[0] * bounds.width - size / 2),
+        y: Math.round(anchor[1] * bounds.height - size / 2)
+      };
+      const slot = point && clearsPanels(point) ? point : null;
       icon.classList.toggle('is-positioned', Boolean(slot));
       if (!slot) return;
-      icon.style.left = slot.x + 'px';
-      icon.style.top = slot.y + 'px';
-      icon.style.setProperty('--icon-rot', rotations[index % rotations.length] + 'deg');
+      icon.style.left = Math.max(0, Math.min(bounds.width - size, slot.x)) + 'px';
+      icon.style.top = Math.max(0, Math.min(bounds.height - size, slot.y)) + 'px';
+      icon.style.setProperty('--icon-rot', `${Math.round(Math.sin(index * 2.4) * 12)}deg`);
     });
+
+
   }
 }
 
@@ -4753,17 +4877,53 @@ arrangeAuthIcons();
 const authDemoCopy = $('#authDemoCopy');
 const authDemoResult = $('#authDemoResult');
 const authDemoOriginalCopy = authDemoCopy.innerHTML;
-const authDemoOriginalResult = authDemoResult.innerHTML;
+const updateDemoMetrics = () => {
+  const text = authDemoCopy.innerText.trim();
+  const words = text ? text.split(/\s+/).length : 0;
+  $('#authDemoWordCount').textContent = words;
+  $('#authDemoReadTime').textContent = Math.max(1, Math.ceil(words / 4));
+};
+updateDemoMetrics();
 $('#authDemoToggle').onclick = event => {
-  const revised = authDemoResult.toggleAttribute('data-revised');
+  const revised = event.currentTarget.getAttribute('aria-pressed') !== 'true';
+  event.currentTarget.setAttribute('aria-pressed', String(revised));
   if (revised) {
-    authDemoCopy.textContent = 'Our product helps teams get started with a guided onboarding process.';
-    authDemoResult.innerHTML = '<strong>Numeric guarantee removed</strong><p>Check the revised wording against your guidelines before publishing.</p>';
+    const originalText = authDemoCopy.innerText;
+    const cleaned = originalText
+      .replace(/\bgroundbreaking\b/gi, 'thoughtfully designed')
+      .replace(/\bcarbon-neutral\b/gi, 'made with lower-impact')
+      .replace(/\bguarantees?\b/gi, 'is designed to support');
+    authDemoCopy.textContent = cleaned;
+    const remaining = (cleaned.match(/\b(groundbreaking|carbon-neutral|guarantees?)\b/gi) || []).length;
+    const score = remaining ? 88 : 96;
+    $('#authDemoFlagCount').textContent = String(remaining);
+    $('#authDemoPending').textContent = remaining ? `${remaining} Flags Pending` : 'Ready to recheck';
+    $('#authDemoScore').textContent = String(score);
+    $('#authDemoProgress').style.width = `${score}%`;
+    $('#authDemoAction').textContent = remaining ? 'Review required' : 'Ready to recheck';
+    $('#authDemoScoreNote').textContent = remaining ? 'Some flagged wording remains. Review the draft before publishing.' : 'Guideline edits applied. Run a fresh audit before publishing.';
+    $('#authDemoLexicon').textContent = remaining ? '88%' : '100%';
+    $('#authDemoLexicon').className = remaining ? 'mid' : '';
+    $('#authDemoEsg').textContent = remaining ? '78%' : '93%';
+    $('#authDemoEsg').className = 'mid';
+    authDemoResult.textContent = remaining ? `${remaining} flagged phrase(s) remain for your review.` : 'Guideline edits applied · run a fresh audit before publishing.';
+    event.currentTarget.textContent = '↻  Restore sample findings';
   } else {
     authDemoCopy.innerHTML = authDemoOriginalCopy;
-    authDemoResult.innerHTML = authDemoOriginalResult;
+    $('#authDemoFlagCount').textContent = '2';
+    $('#authDemoPending').textContent = '2 Flags Pending';
+    $('#authDemoScore').textContent = '81';
+    $('#authDemoProgress').style.width = '81%';
+    $('#authDemoAction').textContent = 'Action required';
+    $('#authDemoScoreNote').textContent = '2 claims need evidence or revised wording before publishing.';
+    $('#authDemoLexicon').textContent = '78%';
+    $('#authDemoLexicon').className = 'mid';
+    $('#authDemoEsg').textContent = '62%';
+    $('#authDemoEsg').className = 'low';
+    authDemoResult.textContent = '';
+    event.currentTarget.textContent = '↻  Apply Guideline Rules';
   }
-  event.currentTarget.textContent = revised ? 'Show original draft' : 'Preview suggested edit';
+  updateDemoMetrics();
 };
 
 const accountForm = $('#accountForm');
