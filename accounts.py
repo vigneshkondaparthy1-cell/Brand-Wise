@@ -1,15 +1,12 @@
 from contextlib import closing
-from email.message import EmailMessage
 from hashlib import pbkdf2_hmac, sha256
-from hmac import compare_digest, new as hmac_new
+from hmac import compare_digest
 from http.cookies import SimpleCookie, CookieError
 from pathlib import Path
 import json
 import os
 import re
 import secrets
-import smtplib
-import ssl
 import sqlite3
 import time
 import urllib.error
@@ -31,13 +28,6 @@ ROLES = {
 }
 SESSION_AGE = 86400
 OTP_TTL = 600
-OTP_COOLDOWN = 60
-OTP_DAILY_LIMIT = 8
-OTP_MAX_ATTEMPTS = 5
-
-class EmailDeliveryError(ValueError):
-    pass
-
 def connect():
     if database.uses_postgres():
         return database.connect()
@@ -175,240 +165,53 @@ def is_local_dev():
         return False
     return True
 
-def _send_otp_message(email, code, password_reset=False):
-    resend_api_key = os.environ.get('RESEND_API_KEY', '').strip()
-    resend_sender = os.environ.get('RESEND_FROM', '').strip()
-    subject = 'Reset your BrandWise password' if password_reset else 'Your BrandWise verification code'
-    purpose = 'password reset' if password_reset else 'email verification'
-    text_body = (
-        f'Your BrandWise password reset code is {code}.\n\n'
-        'Enter this code in the password reset form. It expires in 10 minutes. '
-        'If you did not request a password reset, you can ignore this email.'
-        if password_reset else
-        f'Your BrandWise email verification code is {code}.\n\n'
-        'This code expires in 10 minutes. If you did not request it, you can ignore this email.'
-    )
-    if resend_api_key and not resend_api_key.startswith('re_your_key'):
-        if not resend_sender:
-            if not is_local_dev():
-                raise EmailDeliveryError('Resend is selected, but RESEND_FROM is empty. Set it to a sender address permitted by your Resend account.')
-        else:
-            payload = json.dumps({
-                'from': resend_sender,
-                'to': [email],
-                'subject': subject,
-                'text': text_body,
-            }).encode('utf-8')
-            request = urllib.request.Request(
-                'https://api.resend.com/emails',
-                data=payload,
-                headers={
-                    'Authorization': f'Bearer {resend_api_key}',
-                    'Content-Type': 'application/json',
-                },
-                method='POST',
-            )
-            try:
-                with urllib.request.urlopen(request, timeout=20) as response:
-                    if 200 <= response.status < 300:
-                        return None
-            except urllib.error.HTTPError as exc:
-                if not is_local_dev():
-                    detail = ''
-                    try:
-                        response_data = json.loads(exc.read(4096).decode('utf-8', errors='replace'))
-                        detail = response_data.get('message', '') if isinstance(response_data, dict) else ''
-                    except (ValueError, UnicodeDecodeError):
-                        pass
-                    message = f'Resend could not send the {purpose} code (HTTP {exc.code}).'
-                    if exc.code == 403:
-                        if 'resend.dev' in resend_sender.casefold():
-                            detail = 'The Resend test sender can only deliver to the email address that owns the Resend account. For verification emails to other users, verify a sending domain and use a sender address on that domain in RESEND_FROM.'
-                        else:
-                            detail = 'Resend denied this sender. Verify the sending domain used by RESEND_FROM and make sure RESEND_API_KEY belongs to the same Resend account and has email-sending access. Update the Render environment variables and redeploy.'
-                    elif exc.code == 401:
-                        detail = 'Resend rejected the API key. Replace RESEND_API_KEY in the Render environment with an active key from the same Resend account, then redeploy.'
-                    if detail:
-                        message += f' {detail[:240]}'
-                    raise EmailDeliveryError(message) from None
-            except (OSError, urllib.error.URLError, TimeoutError) as exc:
-                if not is_local_dev():
-                    raise EmailDeliveryError('Could not reach Resend to send the code. Check the network connection and Resend service status, then try again.') from exc
-
-    host = os.environ.get('SMTP_HOST', '').strip()
-    user = os.environ.get('SMTP_USER', '').strip()
-    password = os.environ.get('SMTP_PASSWORD', '')
-    if host.casefold() == 'smtp.gmail.com':
-        # Google presents App Passwords in groups; whitespace is only visual.
-        password = ''.join(password.split())
-    sender = os.environ.get('SMTP_FROM', '').strip() or user
+def _require_fresh_firebase_link(id_token):
+    """Accept only a recently authenticated, verified Firebase email identity."""
+    identity = firebase_user_from_token(id_token)
+    if not identity['email_verified']:
+        raise ValueError('Open the Firebase verification link before continuing.')
+    # accounts:lookup validates the token; auth_time prevents reusing an older
+    # signed-in Firebase session for a sensitive BrandWise account change.
     try:
-        port = int(os.environ.get('SMTP_PORT', '587'))
-    except ValueError:
-        port = 587
-
-    smtp_configured = bool(host and sender and user and password)
-    gmail_invalid_pwd = bool(host.casefold() == 'smtp.gmail.com' and len(password) != 16)
-
-    if smtp_configured and not gmail_invalid_pwd:
-        message = EmailMessage()
-        message['Subject'] = subject
-        message['From'] = sender
-        message['To'] = email
-        message.set_content(text_body)
-        try:
-            context = ssl.create_default_context()
-            if port == 465:
-                with smtplib.SMTP_SSL(host, port, timeout=15, context=context) as client:
-                    client.login(user, password)
-                    client.send_message(message)
-            else:
-                with smtplib.SMTP(host, port, timeout=15) as client:
-                    client.ehlo()
-                    client.starttls(context=context)
-                    client.ehlo()
-                    client.login(user, password)
-                    client.send_message(message)
-            return None
-        except smtplib.SMTPAuthenticationError as exc:
-            if not is_local_dev():
-                raise EmailDeliveryError('Gmail rejected SMTP sign-in. Check the App Password, or configure RESEND_API_KEY and RESEND_FROM in .env to send without Gmail SMTP.') from exc
-        except (OSError, smtplib.SMTPException) as exc:
-            if not is_local_dev():
-                raise EmailDeliveryError('We could not send the code. Check the SMTP settings in your hosting environment and try again.') from exc
-
-    # In local development, gracefully fall back to local dev verification code
-    if is_local_dev():
-        print(f"\n=======================================================", flush=True)
-        print(f"[BrandWise Local OTP] Email: {email}", flush=True)
-        print(f"[BrandWise Local OTP] Code:  {code}", flush=True)
-        print(f"=======================================================\n", flush=True)
-        return code
-
-    if host.casefold() == 'smtp.gmail.com' and len(password) != 16:
-        raise EmailDeliveryError('Gmail SMTP requires a 16-character Google App Password in SMTP_PASSWORD, not your regular Gmail password. Create one with 2-Step Verification enabled.')
-    raise EmailDeliveryError('Email delivery is not configured. To avoid Gmail 2-Step Verification, set RESEND_API_KEY and RESEND_FROM in .env; otherwise configure all SMTP settings.')
-
-def send_email_otp(raw_email):
-    email = normalize_email(raw_email)
-    now = int(time.time())
-    code = f'{secrets.randbelow(1_000_000):06d}'
-    salt = secrets.token_bytes(16)
-    code_hash = hmac_new(salt, code.encode(), 'sha256').digest()
-    with closing(connect()) as db, db:
-        if db.execute('SELECT 1 FROM accounts WHERE email = ?', (email,)).fetchone():
-            raise ValueError('This email is already registered.')
-        old = db.execute('SELECT * FROM email_verifications WHERE email = ?', (email,)).fetchone()
-        if old and now - old['last_sent'] < OTP_COOLDOWN:
-            wait = OTP_COOLDOWN - (now - old['last_sent'])
-            raise ValueError(f'Please wait {wait} seconds before requesting another code.')
-        window = old['send_window'] if old and now - old['send_window'] < 86400 else now
-        sends = old['sends_in_window'] + 1 if old and window == old['send_window'] else 1
-        if sends > OTP_DAILY_LIMIT:
-            raise ValueError('Too many codes requested for this email. Try again later.')
-        db.execute("""INSERT INTO email_verifications
-                      (email, code_hash, salt, expires, attempts, verified_until, last_sent, send_window, sends_in_window)
-                      VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?)
-                      ON CONFLICT(email) DO UPDATE SET code_hash=excluded.code_hash, salt=excluded.salt,
-                        expires=excluded.expires, attempts=0, verified_until=0, last_sent=excluded.last_sent,
-                        send_window=excluded.send_window, sends_in_window=excluded.sends_in_window""",
-                   (email, code_hash, salt, now + OTP_TTL, now, window, sends))
-    try:
-        dev_code = _send_otp_message(email, code)
-        return {'ok': True, 'dev_code': dev_code}
-    except EmailDeliveryError:
-        with closing(connect()) as db, db:
-            db.execute('DELETE FROM email_verifications WHERE email = ? AND verified_until = 0', (email,))
-        raise
-
-def verify_email_otp(raw_email, code):
-    email = normalize_email(raw_email)
-    if not isinstance(code, str) or not re.fullmatch(r'\d{6}', code.strip()):
-        raise ValueError('Enter the six-digit code from your email.')
-    now = int(time.time())
-    with closing(connect()) as db, db:
-        row = db.execute('SELECT * FROM email_verifications WHERE email = ?', (email,)).fetchone()
-        if not row:
-            raise ValueError('Request a new verification code first.')
-        if row['expires'] < now:
-            db.execute('DELETE FROM email_verifications WHERE email = ?', (email,))
-            db.commit()
-            raise ValueError('That code has expired. Request a new one.')
-        if row['attempts'] >= OTP_MAX_ATTEMPTS:
-            raise ValueError('Too many incorrect codes. Request a new one.')
-        expected = hmac_new(row['salt'], code.strip().encode(), 'sha256').digest()
-        if not compare_digest(expected, row['code_hash']):
-            db.execute('UPDATE email_verifications SET attempts = attempts + 1 WHERE email = ?', (email,))
-            db.commit()
-            raise ValueError('That code is incorrect. Check the email and try again.')
-        db.execute('UPDATE email_verifications SET verified_until = ? WHERE email = ?', (now + OTP_TTL, email))
+        body = id_token.split('.')[1]
+        import base64
+        claims = json.loads(base64.urlsafe_b64decode(body + '=' * (-len(body) % 4)))
+        auth_time = int(claims.get('auth_time', 0))
+    except (IndexError, ValueError, TypeError, UnicodeError) as exc:
+        raise ValueError('Open a fresh Firebase verification link and try again.') from exc
+    if not 0 <= int(time.time()) - auth_time <= 600:
+        raise ValueError('That verification is too old. Request a new email link.')
+    return identity
 
 
-def send_password_reset_otp(raw_email):
-    email = normalize_email(raw_email)
-    now = int(time.time())
-    with closing(connect()) as db, db:
-        account = db.execute('SELECT 1 FROM accounts WHERE email = ?', (email,)).fetchone()
-        if not account:
-            return False
-        old = db.execute('SELECT * FROM password_resets WHERE email = ?', (email,)).fetchone()
-        if old and now - old['last_sent'] < OTP_COOLDOWN:
-            return False
-        window = old['send_window'] if old and now - old['send_window'] < 86400 else now
-        sends = old['sends_in_window'] + 1 if old and window == old['send_window'] else 1
-        if sends > OTP_DAILY_LIMIT:
-            return False
-        code = f'{secrets.randbelow(1_000_000):06d}'
-        salt = secrets.token_bytes(16)
-        code_hash = hmac_new(salt, code.encode(), 'sha256').digest()
-        db.execute("""INSERT INTO password_resets
-                      (email, code_hash, salt, expires, attempts, last_sent, send_window, sends_in_window)
-                      VALUES (?, ?, ?, ?, 0, ?, ?, ?)
-                      ON CONFLICT(email) DO UPDATE SET code_hash=excluded.code_hash, salt=excluded.salt,
-                        expires=excluded.expires, attempts=0, last_sent=excluded.last_sent,
-                        send_window=excluded.send_window, sends_in_window=excluded.sends_in_window""",
-                   (email, code_hash, salt, now + OTP_TTL, now, window, sends))
-    try:
-        dev_code = _send_otp_message(email, code, password_reset=True)
-        return {'ok': True, 'dev_code': dev_code}
-    except EmailDeliveryError:
-        with closing(connect()) as db, db:
-            db.execute('DELETE FROM password_resets WHERE email = ?', (email,))
-        raise
-
-
-def reset_password_with_email_otp(raw_email, code, new_password):
-    email = normalize_email(raw_email)
-    if not isinstance(code, str) or not re.fullmatch(r'\d{6}', code.strip()):
-        raise ValueError('Enter the six-digit code from your email.')
+def reset_password_with_firebase_token(id_token, new_password):
+    """Reset a custom BrandWise password after Firebase verifies email ownership."""
+    identity = _require_fresh_firebase_link(id_token)
     if not isinstance(new_password, str) or not 4 <= len(new_password) <= 128:
         raise ValueError('Use a new password between 4 and 128 characters.')
-    now = int(time.time())
-    with closing(connect()) as db:
-        db.execute('BEGIN IMMEDIATE')
-        reset = db.execute('SELECT * FROM password_resets WHERE email = ?', (email,)).fetchone()
-        account = db.execute('SELECT username FROM accounts WHERE email = ?', (email,)).fetchone()
-        if not reset or not account:
-            db.rollback()
-            raise ValueError('The email or verification code is invalid. Request a new code and try again.')
-        if reset['expires'] < now:
-            db.execute('DELETE FROM password_resets WHERE email = ?', (email,))
-            db.commit()
-            raise ValueError('That code has expired. Request a new one.')
-        if reset['attempts'] >= OTP_MAX_ATTEMPTS:
-            db.rollback()
-            raise ValueError('Too many incorrect codes. Request a new one.')
-        expected = hmac_new(reset['salt'], code.strip().encode(), 'sha256').digest()
-        if not compare_digest(expected, reset['code_hash']):
-            db.execute('UPDATE password_resets SET attempts = attempts + 1 WHERE email = ?', (email,))
-            db.commit()
-            raise ValueError('That code is incorrect. Check the email and try again.')
+    email = identity['email']
+    with closing(connect()) as db, db:
+        account = db.execute('SELECT username FROM accounts WHERE lower(email)=lower(?)', (email,)).fetchone()
+        if not account:
+            raise ValueError('No BrandWise account uses this email.')
         salt = secrets.token_bytes(16)
-        db.execute('UPDATE accounts SET salt=?, password_hash=? WHERE email=?', (salt, digest(new_password, salt), email))
+        db.execute('UPDATE accounts SET salt=?, password_hash=? WHERE username=?',
+                   (salt, digest(new_password, salt), account['username']))
         db.execute('DELETE FROM sessions WHERE username=?', (account['username'],))
         db.execute('DELETE FROM password_resets WHERE email=?', (email,))
-        db.commit()
     return True
+
+
+def verify_profile_email_with_firebase_token(headers, id_token):
+    """Authorize a profile email change using Firebase's verified email link."""
+    if not current_user(headers):
+        raise ValueError('Sign in before changing your profile email.')
+    identity = _require_fresh_firebase_link(id_token)
+    now = int(time.time())
+    with closing(connect()) as db, db:
+        db.execute('INSERT INTO email_verifications (email, salt, code_hash, expires, attempts, verified_until, last_sent, send_window, sends_in_window) VALUES (?, ?, ?, ?, 0, ?, ?, ?, 0) ON CONFLICT(email) DO UPDATE SET verified_until=excluded.verified_until',
+                   (identity['email'], b'', b'', now + OTP_TTL, now + OTP_TTL, now, now))
+    return identity['email']
 
 def register(data):
     fields = ('username', 'email', 'name', 'role', 'organization', 'work', 'responsibilities', 'password')
