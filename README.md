@@ -5,7 +5,7 @@ BrandWise is a local content review demo. It checks marketing copy against the c
 ## Run locally
 
 1. Use Python 3.10 or newer.
-2. Copy `.env.example` to `.env`. To send registration and password-reset codes without Gmail 2-Step Verification, create a Resend API key and set `RESEND_API_KEY` and `RESEND_FROM`. The sender must be permitted by your Resend account; verify a domain for production delivery. Do not paste the API key into chat or commit it. Alternatively configure SMTP; Gmail SMTP requires a Google App Password and enabled 2-Step Verification. Add a `GEMINI_API_KEY` only if you want optional Gemini review. Rule checks work without an AI key. Set `DATABASE_URL` to use Neon PostgreSQL; optionally set `DATABASE_URL_UNPOOLED` for schema migrations.
+2. Copy `.env.example` to `.env` for optional local settings. Registration, profile email verification, and password reset use Firebase email links in the browser. The old Resend and SMTP code endpoints are retired. In Firebase Console, enable **Authentication → Sign-in method → Email/Password → Email link (passwordless sign-in)** and authorize the app domains, including `brand-wise.onrender.com` and `localhost` for local testing. Add `GEMINI_API_KEY` only for optional Gemini review. Rule checks work without an AI key. Set `DATABASE_URL` to use Neon PostgreSQL; optionally set `DATABASE_URL_UNPOOLED` for schema migrations.
 3. Install dependencies with `python -m pip install -r requirements.txt`.
 4. Run `python server.py` and open `http://127.0.0.1:8765`.
 
@@ -15,7 +15,7 @@ For Render, add `DATABASE_URL` using Neon's pooled connection string. Also add `
 
 ## Firebase Authentication
 
-The Firebase CLI project target is `brand-wise-7318f`, with Email/Password authentication declared in `firebase.json`. This config is not deployed automatically. After installing or running the Firebase CLI and signing in with an account that can access the project, apply it with `npx -y firebase-tools@latest deploy --only auth`. The current BrandWise sign-in page and account/session backend still use the existing account system; deploying this provider configuration alone does not migrate users or switch app sign-in to Firebase.
+The Firebase project is `brand-wise-7318f`. Firebase sends and verifies email links for new accounts, email changes, and password resets. BrandWise keeps its own password hashes and sessions so four-character passwords remain supported. A Firebase link only establishes ownership of the email; the server validates the resulting Firebase ID token before registering or resetting a BrandWise password. Firebase's Email link provider and authorized domains must be enabled in the Console; changing `firebase.json` alone does not enable delivery. Resetting a password invalidates existing BrandWise sessions.
 
 ## Local demo sign-ins
 
@@ -30,7 +30,7 @@ These credentials are for this local demo only. Do not reuse them on a public de
 | Brand Manager | `test_brandmanager` | `TestUser2026!` |
 
 Admin accounts are provisioned locally and cannot be created through registration.
-New accounts must verify their email with a 6-digit code before registration. Codes expire after 10 minutes; Resend or SMTP settings are required for delivery. New passwords must be at least 4 characters.
+New accounts must open the Firebase verification link before registration. New passwords must be at least 4 characters.
 
 ## AI and privacy
 
