@@ -10,6 +10,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,700;0,800;0,900;1,800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
 
 <script>
+document.addEventListener('contextmenu', event => event.preventDefault());
+
 try {
   if (localStorage.getItem('brandwise-theme') === 'dark') {
     document.documentElement.dataset.theme = 'dark';
@@ -548,6 +550,27 @@ input:focus, select:focus, textarea:focus { border-color: var(--blue); box-shado
   resize: vertical;
 }
 
+.audit-report-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+#btnExportPDF {
+  min-height: 44px;
+  padding: 8px 18px;
+  margin-inline-start: auto;
+  font-size: 13px;
+}
+
 .report-breakdown-row {
   display: flex;
   flex-direction: column;
@@ -1058,7 +1081,8 @@ table.styled-table tr:hover td { background: var(--card-elevated); }
 @media (max-width: 420px) { .architecture-stage { grid-template-columns: minmax(0, 1fr); gap: 6px; } }
 #userRoleSelect option { background-color: var(--card-bg); color: var(--text); }
 
-html:not([data-signed-in]) body {
+html:not([data-signed-in]) body { display: block; }
+.auth-sign-in-stage {
   position: relative;
   isolation: isolate;
   display: flex;
@@ -1067,12 +1091,24 @@ html:not([data-signed-in]) body {
   min-height: 100dvh;
   padding: 24px 16px;
   background:
-    radial-gradient(ellipse at 12% 68%, #ffe09b 0%, transparent 43%),
-    radial-gradient(ellipse at 88% 65%, #ffd9ef 0%, transparent 40%),
-    linear-gradient(180deg, #2e9df4 0%, #2e9df4 32%, #e7f3ff 70%, #fffaf0 100%);
+    radial-gradient(ellipse 58% 46% at 12% 64%, #ffe09b, transparent),
+    radial-gradient(ellipse 58% 47% at 88% 62%, #ffd9ef, transparent),
+    linear-gradient(180deg, #2e9df4 25%, #e7f3ff 70%, #fffaf0);
 }
-#accountGate .auth-cloud {
-  position: fixed;
+:root[data-theme="dark"] .auth-sign-in-stage {
+  background:
+    radial-gradient(ellipse 58% 46% at 12% 64%, #493d2d, transparent),
+    radial-gradient(ellipse 58% 47% at 88% 62%, #403244, transparent),
+    linear-gradient(180deg, #101722 25%, #192331 70%, #202a38);
+}
+html:not([data-signed-in]) body {
+  background:
+    radial-gradient(ellipse at 12% 0%, #ffe09b 0%, transparent 43%),
+    radial-gradient(ellipse at 88% 0%, #ffd9ef 0%, transparent 40%),
+    #2e9df4;
+}
+:is(#accountGate, #authOverview) .auth-cloud {
+  position: absolute;
   z-index: -1;
   width: var(--cloud-size);
   height: calc(var(--cloud-size) * .45);
@@ -1157,7 +1193,6 @@ html[data-signed-in] #authPageHeader { display: none !important; }
 #accountGate[data-registering] input,
 #accountGate[data-registering] select { margin-bottom: 14px; }
 #accountGate[data-registering] h1 { margin-bottom: 18px; }
-#accountGate[data-registering] .auth-features { display: none; }
 .email-verification { min-width: 0; }
 .email-verification > label, .email-otp-panel > label { display: block; margin-bottom: 2px; color: var(--text); font-size: 13px; }
 #profileEditForm > label { display: flex; flex-direction: column; align-items: stretch; gap: 6px; min-width: 0; color: var(--text); font-size: 14px; font-weight: 700; }
@@ -1225,18 +1260,37 @@ html[data-theme="dark"] .delete-account-confirmation { background:color-mix(in s
 .asset-empty-icon { display:grid; place-items:center; width:48px; height:48px; margin:0 auto 10px; border-radius:14px; background:var(--blue-light); color:var(--blue-text,var(--blue)); font-size:25px; }
 .asset-empty-state p { max-width:540px; margin:5px auto 14px; color:var(--text-muted); }
 .asset-storage-note { margin:8px 0 0; color:var(--text-muted); font-size:11px; }
-.calendar-layout { display:grid; grid-template-columns:minmax(0,1.55fr) minmax(280px,.85fr); gap:16px; margin-top:18px; align-items:start; }
-.calendar-month-heading { display:flex; align-items:center; gap:10px; margin-bottom:16px; }
-.calendar-month-heading h2 { flex:1; margin:0; color:var(--navy); font-size:21px; }
-.calendar-month-heading button { min-width:38px; min-height:36px; margin:0; }
-.calendar-weekdays, .calendar-days { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:6px; }
-.calendar-weekdays { margin-bottom:6px; color:var(--text-muted); font-size:11px; font-weight:800; text-align:center; }
-.calendar-day { position:relative; min-height:64px; padding:9px 7px; border:1px solid var(--line); border-radius:10px; background:var(--card-bg); color:var(--text); text-align:left; cursor:pointer; }
-.calendar-day:hover { border-color:var(--blue); background:var(--card-subtle); }
-.calendar-day.is-outside { color:var(--text-muted); opacity:.55; }
-.calendar-day.is-today { border-color:var(--blue); box-shadow:inset 0 0 0 1px var(--blue); }
-.calendar-day.is-selected { background:var(--blue-light); color:var(--blue-text,var(--blue)); }
-.calendar-day-count { position:absolute; right:7px; bottom:6px; display:grid; min-width:18px; height:18px; place-items:center; padding:0 4px; border-radius:999px; background:var(--blue); color:#fff; font-size:10px; font-weight:800; }
+.calendar-layout { display:grid; grid-template-columns:minmax(0,1fr); gap:16px; }
+.calendar-board.white-panel { min-width:0; padding:0; overflow:hidden; }
+.calendar-month-heading, .calendar-controls, .calendar-filters { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.calendar-month-heading { justify-content:space-between; padding:18px; }
+.calendar-month-heading h2 { margin:0; color:var(--navy); font-size:24px; }
+.calendar-range, .calendar-legend { color:var(--text-muted); font-size:12px; }
+.calendar-controls button { min-height:38px; }
+#calendarSearch { margin:0; width:min(100%,215px); }
+.calendar-filters { justify-content:space-between; padding:10px 18px; background:var(--card-subtle); border-block:1px solid var(--line); }
+.calendar-filter-buttons, .calendar-legend { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.calendar-filter-buttons button[aria-pressed="true"] { background:var(--blue); color:#fff; border-color:var(--blue); }
+.calendar-grid-scroll { overflow-x:auto; }
+.calendar-weekdays, .calendar-days { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); min-width:590px; }
+.calendar-weekdays { color:var(--text-muted); font-size:12px; font-weight:800; text-align:center; }
+.calendar-weekdays span { padding:10px 0; }
+.calendar-day { display:flex; flex-direction:column; align-items:stretch; gap:4px; min-height:110px; min-width:0; padding:8px; border:0; border-top:1px solid var(--line); border-right:1px solid var(--line); background:var(--card-bg); color:var(--text); text-align:left; font:inherit; cursor:pointer; }
+.calendar-day:nth-child(7n) { border-right:0; }
+.calendar-day:hover, .calendar-day.is-outside { background:var(--card-subtle); }
+.calendar-day.is-outside { color:var(--text-muted); }
+.calendar-day.is-selected { background:var(--blue-light); box-shadow:inset 0 0 0 2px var(--blue); }
+.calendar-day-number { display:grid; place-items:center; width:24px; height:24px; font-size:12px; font-weight:800; }
+.calendar-day.is-today .calendar-day-number { border-radius:50%; background:var(--blue); color:#fff; }
+.calendar-event-chip { display:flex; align-items:center; justify-content:space-between; gap:6px; padding:3px 5px; font-size:11px; border:1px solid var(--line); border-radius:5px; background:var(--blue-light); color:var(--blue-text,var(--blue)); }
+.calendar-event-chip[data-type="Meeting"] { background:var(--card-elevated); color:var(--text); }
+.calendar-event-chip[data-type="Reminder"] { background:var(--orange-light); color:var(--orange-text,var(--orange)); }
+.calendar-event-chip[data-type="Review"] { background:var(--card-subtle); color:var(--text); border-color:var(--green); }
+.calendar-chip-title { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.calendar-chip-time { white-space:nowrap; font-size:10px; }
+.calendar-more { font-size:11px; font-weight:700; color:var(--blue-text,var(--blue)); }
+.calendar-board > .calendar-notice { border-top:1px solid var(--line); margin:0; padding:12px 18px; }
+.calendar-detail-layout { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; gap:16px; }
 .calendar-notice { margin:12px 0 0; color:var(--text-muted); font-size:11px; }
 .calendar-event-form-panel h2, .calendar-list-heading h2 { margin:0 0 4px; color:var(--navy); font-size:18px; }
 .calendar-event-form-panel > p, .calendar-list-heading p { margin:0 0 14px; color:var(--text-muted); font-size:12px; }
@@ -1255,8 +1309,8 @@ html[data-theme="dark"] .delete-account-confirmation { background:color-mix(in s
 .calendar-event-detail { margin-top:3px; color:var(--text-muted); font-size:11px; }
 .calendar-event-empty { padding:18px; border:1px dashed var(--line-strong); border-radius:12px; color:var(--text-muted); text-align:center; font-size:12px; }
 .optional-label { color:var(--text-muted); font-weight:400; }
-@media (max-width: 950px) { .brand-asset-toolbar { grid-template-columns:repeat(2,minmax(0,1fr)); } .calendar-layout { grid-template-columns:1fr; } }
-@media (max-width: 600px) { .brand-asset-toolbar { grid-template-columns:1fr; } .calendar-day { min-height:46px; padding:6px 5px; font-size:12px; } .calendar-event-row { grid-template-columns:64px minmax(0,1fr); } .calendar-event-row > :last-child { grid-column:2; } .calendar-month-heading { gap:5px; } .calendar-month-heading h2 { font-size:18px; } }
+@media (max-width: 950px) { .brand-asset-toolbar { grid-template-columns:repeat(2,minmax(0,1fr)); } .calendar-detail-layout { grid-template-columns:minmax(0,1fr); } }
+@media (max-width: 600px) { .brand-asset-toolbar { grid-template-columns:1fr; } .calendar-event-row { grid-template-columns:64px minmax(0,1fr); } .calendar-event-row > :last-child { grid-column:2; } }
 /* Make the audit lifecycle actions easy to see and tap. */
 #governanceActionButtons { display:flex; align-items:center; gap:8px !important; flex-wrap:wrap; }
 #governanceActionButtons button { min-height:34px; padding:7px 13px !important; font-size:12px !important; font-weight:800; }
@@ -1270,8 +1324,11 @@ html[data-theme="dark"] .delete-account-confirmation { background:color-mix(in s
   #accountGate[data-registering] #accountSubmit,
   #accountGate[data-registering] #accountMode,
   #accountGate[data-registering] #accountError { grid-column: 1; }
-  html:not([data-signed-in]) body:has(#accountGate[data-registering]) { padding-top: 92px; }
   #accountGate[data-registering] { margin: 0 auto 24px; }
+}
+.auth-sign-in-stage:has(#accountGate[data-registering]) { padding-top: 92px; }
+@media (max-height: 620px) {
+  .auth-sign-in-stage { padding-top: 92px; }
 }
 #accountError { color: var(--red); margin-top: 10px; }
 .password-field { position: relative; }
@@ -1285,8 +1342,8 @@ html[data-theme="dark"] .delete-account-confirmation { background:color-mix(in s
 :root[data-theme="dark"] #accountGate .auth-theme-control { color: #acbed4; }
 :root[data-theme="dark"] #accountGate input, :root[data-theme="dark"] #accountGate select { color: #e0e9f5; background: #0d1016; border-color: #394353; }
 :root[data-theme="dark"] #accountGate .password-toggle { color: #acbed4; }
-html[data-theme="dark"]:not([data-signed-in]) body {
-  background: radial-gradient(ellipse at 12% 68%, #493d2d 0%, transparent 42%), radial-gradient(ellipse at 88% 65%, #403244 0%, transparent 40%), linear-gradient(180deg, #101722 0%, #101722 32%, #192331 70%, #202a38 100%);
+:root[data-theme="dark"]:not([data-signed-in]) body {
+  background: radial-gradient(ellipse at 12% 0%, #493d2d 0%, transparent 42%), radial-gradient(ellipse at 88% 0%, #403244 0%, transparent 40%), #101722;
 }
 :root[data-theme="dark"] #accountGate { border-color: #344257; box-shadow: 0 6px 0 #05080c88, 0 20px 55px #05080c66; }
 :root[data-theme="dark"] #accountGate h1 { color: #f2f6fc; }
@@ -1301,17 +1358,19 @@ html[data-theme="dark"]:not([data-signed-in]) body {
 :root[data-theme="dark"] .auth-features span:nth-child(4n+2) svg { background: #493523; color: #ffc17b; }
 :root[data-theme="dark"] .auth-features span:nth-child(4n+3) svg { background: #1d4038; color: #83e0bc; }
 :root[data-theme="dark"] .auth-features span:nth-child(4n+4) svg { background: #382e4d; color: #c7a8ff; }
-html:not([data-signed-in]) body > :not(#accountGate):not(#authPageHeader):not(script),
-html[data-signed-in] #accountGate, #accountGate [hidden] { display: none !important; }
-.auth-features { pointer-events: none; }
+html:not([data-signed-in]) body > :not(#authSignInStage):not(#authOverview):not(#authPageHeader):not(script),
+html[data-signed-in] #authSignInStage, html[data-signed-in] #authOverview,
+#accountGate [hidden] { display: none !important; }
+.auth-features { position: absolute; inset: 0; pointer-events: none; }
 .auth-features > span {
-  position: fixed;
+  position: absolute;
   z-index: 2;
   display: none;
-  width: clamp(30px, 4.2vw, 66px);
-  height: clamp(30px, 4.2vw, 66px);
-  pointer-events: none;
+  width: clamp(34px, 4.2vw, 64px);
+  height: clamp(34px, 4.2vw, 64px);
+  rotate: var(--icon-rot, 0deg);
 }
+.auth-features > span.is-positioned { display: block; }
 .auth-features svg {
   box-sizing: border-box;
   display: block;
@@ -1322,30 +1381,192 @@ html[data-signed-in] #accountGate, #accountGate [hidden] { display: none !import
   border-radius: 25%;
   background: #e7f4ff;
   color: #076caf;
-  box-shadow: 0 5px 0 #17394d24;
+  box-shadow: 0 5px 0 #17394d24, 0 8px 18px #10253818;
 }
 .auth-features span:nth-child(4n+2) svg { background: #fff0da; color: #b76020; }
 .auth-features span:nth-child(4n+3) svg { background: #e4f7ee; color: #22775a; }
 .auth-features span:nth-child(4n+4) svg { background: #f1eaff; color: #7850b4; }
 @media (prefers-reduced-motion: no-preference) {
-  .auth-features svg { animation: auth-icon-float 4s ease-in-out infinite; }
-  .auth-features span:nth-child(3n+2) svg { animation-delay: -1.3s; }
-  .auth-features span:nth-child(3n) svg { animation-delay: -2.6s; }
+  .auth-features svg { animation: auth-icon-float 4.2s ease-in-out infinite; }
+  .auth-features span:nth-child(3n+1) svg { animation-delay: 0s; }
+  .auth-features span:nth-child(3n+2) svg { animation-delay: -1.4s; }
+  .auth-features span:nth-child(3n) svg { animation-delay: -2.8s; }
 }
 @keyframes auth-icon-float {
-  0%, 100% { transform: translateY(3px) rotate(-5deg); }
-  50% { transform: translateY(-5px) rotate(5deg); }
+  0%, 100% { transform: translateY(3px) rotate(-3deg); }
+  50% { transform: translateY(-5px) rotate(3deg); }
+}
+#authPageHeader .auth-overview-link { color: var(--blue-text,var(--blue)); font-size: 14px; font-weight: 750; }
+#authSignInStage { overflow-x: clip; position: relative; }
+#accountGate { scroll-margin-top: 94px; }
+#authOverview {
+  position: relative;
+  isolation: isolate;
+  overflow-x: clip;
+  padding: clamp(110px,10vw,160px) 16px clamp(36px,6vw,76px);
+  scroll-margin-top: 82px;
+}
+@media (max-width: 640px) {
+  #authOverview { padding-top: 150px; padding-bottom: 80px; }
+  #authSignInStage { padding-bottom: 80px; }
+}
+.auth-overview-wrap { max-width: 1080px; margin: auto; }
+.auth-overview-intro { background: var(--card-bg); border: 1px solid var(--line); border-radius: var(--radius-md); box-shadow: var(--shadow-subtle); padding: clamp(20px,3vw,38px); text-align: center; max-width: 650px; margin: 0 auto 28px; }
+:root[data-theme="dark"] .auth-overview-intro { border-color: #3b4a5e; }
+.auth-overview-intro h2 { font-size: clamp(38px,7vw,70px); margin: 8px 0 12px; }
+.auth-overview-intro strong { color: var(--blue-text,var(--blue)); }
+.auth-overview-intro .auth-headline-orange { color: var(--orange); }
+.auth-overview-intro p, .auth-overview-card p { font-size: 1rem; }
+.auth-overview-kicker { color: var(--blue-text,var(--blue)); font-size: 13px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+.auth-overview-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 18px; }
+.auth-overview-actions a { font-size: 14px; }
+.auth-demo, .auth-overview-card, .auth-overview-cta {
+  background: var(--card-bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-subtle);
+}
+#authAuditPreview, #authFeatureSummary { scroll-margin-top: 94px; }
+.auth-demo { overflow: hidden; }
+#authDemoTitle { font-size: 21px; line-height: 1.3; }
+.auth-demo-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 16px 22px; border-bottom: 1px solid var(--line); }
+.auth-demo-grid { display: grid; grid-template-columns: 3fr 2fr; }
+.auth-demo-panel { min-width: 0; padding: clamp(16px,3vw,28px); }
+.auth-demo-panel + .auth-demo-panel { background: var(--card-elevated); border-inline-start: 1px solid var(--line); }
+.auth-demo-panel h3 { margin-bottom: 8px; font-size: 24px; }
+.auth-demo-copy { margin: 0 0 14px; padding: 16px; font-size: 1rem; border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.auth-demo-copy mark { background: var(--orange-light); color: var(--text); font-weight: 700; }
+.auth-demo-result { padding: 14px; border-inline-start: 3px solid var(--orange); border-radius: var(--radius-sm); background: var(--card-bg); font-size: 14px; }
+.auth-demo-result[data-revised] { border-inline-start-color: var(--green); }
+.auth-demo-result p { margin-top: 6px; }
+.auth-feature-heading { margin: 48px 0 18px; text-align: center; font-size: clamp(30px,5vw,46px); }
+.auth-overview-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 14px; }
+.auth-overview-card { padding: 20px; }
+.auth-overview-card h3 { margin-bottom: 8px; font-size: 24px; }
+.auth-overview-cta { text-align: center; padding: clamp(32px, 5vw, 64px) 20px; margin: 36px auto 0; max-width: 960px; }
+#accountTitle,
+#authDemoTitle,
+.auth-demo-panel h3,
+.auth-feature-heading,
+.auth-overview-card h3 {
+  letter-spacing: 0.025em;
+}
+.auth-overview-cta h2 { font-size: clamp(30px, 4vw, 52px); line-height: 1.12; letter-spacing: 0.025em; }
+.auth-overview-cta .btn-pill-primary { padding: 14px 28px; font-size: 17px; }
+@media (max-width: 720px) {
+  .auth-demo-grid, .auth-overview-grid { grid-template-columns: minmax(0,1fr); }
+  .auth-demo-panel + .auth-demo-panel { border-inline-start: 0; border-top: 1px solid var(--line); }
+}
+@media (max-width: 480px) {
+  #authPageHeader { padding-inline: 12px; gap: 8px; }
+  #authPageHeader .auth-brand-name { font-size: 17px; }
+  #authPageHeader .auth-overview-link { font-size: 12px; }
+  #authPageHeader .auth-theme-control span { display: none; }
+  #authPageHeader #authTheme { min-width: 0; padding-inline: 6px; }
 }
 </style>
 </head>
 <body>
 <header id="authPageHeader">
   <span class="auth-brand-name">BRANDWISE</span>
-  <label class="auth-theme-control" for="authTheme">Theme
+  <a class="auth-overview-link" href="#accountGate">Sign in</a>
+  <label class="auth-theme-control" for="authTheme"><span>Theme</span>
     <select id="authTheme" aria-label="Choose light or dark theme"><option value="light">Light</option><option value="dark">Dark</option></select>
   </label>
 </header>
-<main id="accountGate" class="white-panel">
+<section id="authOverview" aria-labelledby="authOverviewTitle">
+  <div aria-hidden="true"><span class="auth-cloud"></span><span class="auth-cloud"></span><span class="auth-cloud"></span><span class="auth-cloud"></span></div>
+  <div class="auth-features auth-overview-features" aria-hidden="true">
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="2"/><path d="M15.5 8.5 21 3M17 3h4v4"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5h16v14zM7 15l4-4 3 3 3-5M7 8h1"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h6v6H4zM14 14h6v6h-6zM7 10v7h7M14 7h6M17 4v6"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4v5c0 4-3 7-8 9-5-2-8-5-8-9V7zM8 12l3 3 5-6"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4H5v17h14V4h-3M9 3h6v4H9zM8 12l2 2 5-4M8 18h7"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4M12 15v2"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17a4 4 0 0 1 0-8 6 6 0 0 1 12-2 5 5 0 0 1 3 10M9 17l3 3 5-5"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10v5h4l3 6h3l-3-7 10 4V4L7 10zM7 10v5"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="4"/><path d="M4 21v-2a6 6 0 0 1 12 0v2"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h6l2 2 2-2h6v14h-6l-2 2-2-2H4zM12 6v14"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m9 12 2 2 4-4"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></span>
+  </div>
+  <div class="auth-overview-wrap">
+    <div class="auth-overview-intro">
+      <div class="auth-overview-kicker">Brand governance for content teams</div>
+      <h2 id="authOverviewTitle">Give every<br><strong>draft a</strong><br><strong class="auth-headline-orange">brand check.</strong></h2>
+      <p>Check marketing copy against approved claims, terminology, and disclaimers. See exactly what needs review before the copy goes live.</p>
+      <div class="auth-overview-actions">
+        <a class="btn-pill-primary" href="#authAuditPreview">Try the sample audit</a>
+        <a class="btn-pill-ghost" href="#authFeatureSummary">Explore features</a>
+      </div>
+    </div>
+    <section class="auth-demo" id="authAuditPreview" aria-labelledby="authDemoTitle">
+      <header class="auth-demo-header">
+        <h3 id="authDemoTitle">Audit Workspace preview</h3>
+        <span class="pill-tag pill-blue">Sample audit</span>
+      </header>
+      <div class="auth-demo-grid">
+        <div class="auth-demo-panel">
+          <h3>Product page draft</h3>
+          <blockquote class="auth-demo-copy" id="authDemoCopy">Our product <mark>guarantees 10× faster onboarding</mark> for every team.</blockquote>
+          <button class="btn-pill-primary" id="authDemoToggle" type="button">Preview suggested edit</button>
+        </div>
+        <div class="auth-demo-panel">
+          <h3>Audit report</h3>
+          <div class="auth-demo-result" id="authDemoResult" aria-live="polite">
+            <strong>Unsupported performance claim</strong>
+            <p>The guarantee needs approved evidence. Remove the numeric promise if it cannot be substantiated.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+    <h2 class="auth-feature-heading" id="authFeatureSummary">From draft to approval</h2>
+    <div class="auth-overview-grid">
+      <article class="auth-overview-card"><h3>Official Guidelines</h3><p>Find approved claims, preferred terminology, and required disclaimers in one place.</p></article>
+      <article class="auth-overview-card"><h3>Audit Workspace</h3><p>Paste or import copy, review flagged wording and its sources, compare revisions, and route a draft for approval.</p></article>
+      <article class="auth-overview-card"><h3>Brand Assets</h3><p>Keep shared brand files in the workspace so teammates can find the right materials for their work.</p></article>
+    </div>
+    <div class="auth-overview-cta">
+      <h2>Ready to review your own draft?</h2>
+      <div class="auth-overview-actions"><a class="btn-pill-primary" href="#accountGate">Sign in to BrandWise</a></div>
+    </div>
+  </div>
+</section>
+
+<main class="auth-sign-in-stage" id="authSignInStage">
+  <div class="auth-features" aria-hidden="true">
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="2"/><path d="M15.5 8.5 21 3M17 3h4v4"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5h16v14zM7 15l4-4 3 3 3-5M7 8h1"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h6v6H4zM14 14h6v6h-6zM7 10v7h7M14 7h6M17 4v6"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4v5c0 4-3 7-8 9-5-2-8-5-8-9V7zM8 12l3 3 5-6"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4H5v17h14V4h-3M9 3h6v4H9zM8 12l2 2 5-4M8 18h7"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4M12 15v2"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17a4 4 0 0 1 0-8 6 6 0 0 1 12-2 5 5 0 0 1 3 10M9 17l3 3 5-5"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10v5h4l3 6h3l-3-7 10 4V4L7 10zM7 10v5"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="4"/><path d="M4 21v-2a6 6 0 0 1 12 0v2"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h6l2 2 2-2h6v14h-6l-2 2-2-2H4zM12 6v14"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m9 12 2 2 4-4"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V3h12l4 4v14zM15 3v5h5M8 12h8M8 16h5"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="15" width="6" height="6" rx="1"/><path d="M6 9v6a3 3 0 0 0 3 3h6"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><path d="m9 14 2 2 4-4"/></svg></span>
+  </div>
+<section id="accountGate" class="white-panel" aria-labelledby="accountTitle" tabindex="-1">
   <div class="auth-sky" aria-hidden="true">
     <span class="auth-cloud"></span>
     <span class="auth-cloud"></span>
@@ -1356,32 +1577,6 @@ html[data-signed-in] #accountGate, #accountGate [hidden] { display: none !import
     <span class="auth-cloud"></span>
     <span class="auth-cloud"></span>
     <span class="auth-cloud"></span>
-  </div>
-  <div class="auth-features" aria-hidden="true">
-    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h6l2 2 2-2h6v14h-6l-2 2-2-2H4zM12 6v14"/></svg></span>
-    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17a7 7 0 1 1 0-14 7 7 0 0 1 0 14zM15 15l6 6"/></svg></span>
-    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4v5c0 4-3 7-8 9-5-2-8-5-8-9V7zM8 12l3 3 5-6"/></svg></span>
-    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4H5v17h14V4h-3M9 3h6v4H9zM8 12l2 2 5-4M8 18h7"/></svg></span>
-    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5h16v14zM7 15l4-4 3 3 3-5M7 8h1"/></svg></span>
-    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10v5h4l3 6h3l-3-7 10 4V4L7 10zM7 10v5"/></svg></span>
-    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V3h12l4 4v14zM15 3v5h5M8 12h8M8 16h5"/></svg></span>
-    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7a4 4 0 1 0 8 0 4 4 0 0 0-8 0M4 21v-3a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v3"/></svg></span>
-    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 11h14v10H5zM8 11V7a4 4 0 0 1 8 0v4M12 15v2"/></svg></span>
-    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17a4 4 0 0 1 0-8 6 6 0 0 1 12-2 5 5 0 0 1 3 10M9 17l3 3 5-5"/></svg></span>
-    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h6v6H4zM14 14h6v6h-6zM7 10v7h7M14 7h6M17 4v6"/></svg></span>
-    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9M12 7a5 5 0 1 0 5 5M12 12l9-9M16 3h5v5"/></svg></span>
-    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h6l2 2 2-2h6v14h-6l-2 2-2-2H4zM12 6v14"/></svg></span>
-    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17a7 7 0 1 1 0-14 7 7 0 0 1 0 14zM15 15l6 6"/></svg></span>
-    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4v5c0 4-3 7-8 9-5-2-8-5-8-9V7zM8 12l3 3 5-6"/></svg></span>
-    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4H5v17h14V4h-3M9 3h6v4H9zM8 12l2 2 5-4M8 18h7"/></svg></span>
-    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5h16v14zM7 15l4-4 3 3 3-5M7 8h1"/></svg></span>
-    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10v5h4l3 6h3l-3-7 10 4V4L7 10zM7 10v5"/></svg></span>
-    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V3h12l4 4v14zM15 3v5h5M8 12h8M8 16h5"/></svg></span>
-    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7a4 4 0 1 0 8 0 4 4 0 0 0-8 0M4 21v-3a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v3"/></svg></span>
-    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 11h14v10H5zM8 11V7a4 4 0 0 1 8 0v4M12 15v2"/></svg></span>
-    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17a4 4 0 0 1 0-8 6 6 0 0 1 12-2 5 5 0 0 1 3 10M9 17l3 3 5-5"/></svg></span>
-    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h6v6H4zM14 14h6v6h-6zM7 10v7h7M14 7h6M17 4v6"/></svg></span>
-    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9M12 7a5 5 0 1 0 5 5M12 12l9-9M16 3h5v5"/></svg></span>
   </div>
   <h1 id="accountTitle">Sign in</h1>
   <form id="accountForm">
@@ -1437,8 +1632,8 @@ html[data-signed-in] #accountGate, #accountGate [hidden] { display: none !import
     <div class="reset-password-actions"><button class="btn-pill-ghost" id="backToSignIn" type="button">Back to sign in</button></div>
     <p id="forgotPasswordStatus" role="status" aria-live="polite"></p>
   </form>
+</section>
 </main>
-
 
 <!-- Left Sidebar matching all 4 images -->
 <aside class="sidebar">
@@ -1557,7 +1752,7 @@ html[data-signed-in] #accountGate, #accountGate [hidden] { display: none !import
 
   <main class="page-shell" id="view-profile" hidden>
     <div class="kicker-pills" style="margin-bottom:8px;"><span class="pill-tag pill-blue">ACCOUNT</span><span class="pill-tag pill-gray">PROFILE DETAILS</span></div>
-    <h1>MY PROFILE</h1>
+    <h1 class="spaced-page-title">MY PROFILE</h1>
     <p>Review and update your account details. Changing your email requires a new verification code.</p>
     <div class="workspace-split" style="align-items:start;margin-top:22px;">
       <section class="white-panel">
@@ -1628,7 +1823,7 @@ html[data-signed-in] #accountGate, #accountGate [hidden] { display: none !import
 
   <main class="page-shell" id="view-assets" hidden>
     <div class="page-heading-row">
-      <div><div class="kicker-pills"><span class="pill-tag pill-blue">BRAND LIBRARY</span><span class="pill-tag pill-gray">ASSETS &amp; VERSIONS</span></div><h1>BRAND ASSETS</h1><p>Keep approved logos, colors, fonts, templates, and reference files ready for every content review.</p></div>
+      <div><div class="kicker-pills"><span class="pill-tag pill-blue">BRAND LIBRARY</span><span class="pill-tag pill-gray">ASSETS &amp; VERSIONS</span></div><h1 class="spaced-page-title">BRAND ASSETS</h1><p>Keep approved logos, colors, fonts, templates, and reference files ready for every content review.</p></div>
       <button class="btn-pill-primary" id="uploadBrandAsset">＋ Add brand asset</button><input id="brandAssetFile" type="file" accept="image/*,.pdf,.doc,.docx,.ttf,.otf,.woff,.woff2" hidden>
     </div>
     <div class="brand-asset-toolbar white-panel">
@@ -1645,16 +1840,38 @@ html[data-signed-in] #accountGate, #accountGate [hidden] { display: none !import
 
   <main class="page-shell" id="view-calendar" hidden>
     <div class="page-heading-row">
-      <div><div class="kicker-pills"><span class="pill-tag pill-blue">WORKSPACE PLANNER</span><span class="pill-tag pill-orange">REMINDERS</span></div><h1>CALENDAR</h1><p>Plan campaign reviews, meetings, and follow-up tasks. Turn on browser notifications for timely reminders.</p></div>
+      <div><div class="kicker-pills"><span class="pill-tag pill-blue">WORKSPACE PLANNER</span><span class="pill-tag pill-orange">REMINDERS</span></div><h1 class="spaced-page-title">CALENDAR</h1><p>Plan campaign reviews, meetings, and follow-up tasks. Turn on browser notifications for timely reminders.</p></div>
       <button class="btn-pill-ghost" id="enableCalendarNotifications" type="button">Allow notifications</button>
     </div>
     <div class="calendar-layout">
       <section class="white-panel calendar-board">
-        <div class="calendar-month-heading"><button class="btn-pill-ghost" id="calendarPrevMonth" type="button" aria-label="Previous month">‹</button><h2 id="calendarMonthLabel"></h2><button class="btn-pill-ghost" id="calendarNextMonth" type="button" aria-label="Next month">›</button><button class="btn-pill-ghost" id="calendarToday" type="button">Today</button></div>
-        <div class="calendar-weekdays" aria-hidden="true"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
-        <div class="calendar-days" id="calendarDays"></div>
+        <div class="calendar-month-heading">
+          <div><h2 id="calendarMonthLabel"></h2><div class="calendar-range" id="calendarMonthRange"></div></div>
+          <div class="calendar-controls">
+            <input id="calendarSearch" type="search" aria-label="Search calendar events" placeholder="Search calendar events…">
+            <button class="btn-pill-ghost" id="calendarPrevMonth" type="button" aria-label="Previous month">‹</button>
+            <button class="btn-pill-ghost" id="calendarToday" type="button">Today</button>
+            <button class="btn-pill-ghost" id="calendarNextMonth" type="button" aria-label="Next month">›</button>
+            <button class="btn-pill-primary" id="calendarAddReminder" type="button">+ Add reminder</button>
+          </div>
+        </div>
+        <div class="calendar-filters">
+          <div class="calendar-filter-buttons" role="group" aria-label="Filter calendar by type">
+            <button class="btn-pill-ghost" type="button" data-calendar-type="" aria-pressed="true">All</button>
+            <button class="btn-pill-ghost" type="button" data-calendar-type="Task" aria-pressed="false">Tasks</button>
+            <button class="btn-pill-ghost" type="button" data-calendar-type="Meeting" aria-pressed="false">Meetings</button>
+            <button class="btn-pill-ghost" type="button" data-calendar-type="Review" aria-pressed="false">Reviews</button>
+            <button class="btn-pill-ghost" type="button" data-calendar-type="Reminder" aria-pressed="false">Reminders</button>
+          </div>
+          <span class="calendar-legend" id="calendarMatchCount" role="status"></span>
+        </div>
+        <div class="calendar-grid-scroll" role="region" aria-label="Month view" tabindex="0">
+          <div class="calendar-weekdays" aria-hidden="true"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
+          <div class="calendar-days" id="calendarDays"></div>
+        </div>
         <p class="calendar-notice" id="calendarNotificationStatus" role="status" aria-live="polite">Reminders appear here while the app is open. Browser notifications need permission.</p>
       </section>
+      <div class="calendar-detail-layout">
       <aside class="white-panel calendar-event-form-panel">
         <h2>Add a reminder</h2>
         <p>Schedule a task, meeting, or review checkpoint.</p>
@@ -1668,9 +1885,14 @@ html[data-signed-in] #accountGate, #accountGate [hidden] { display: none !import
           <p id="calendarFormStatus" class="calendar-notice" role="status" aria-live="polite"></p>
         </form>
       </aside>
+      <section class="white-panel">
+        <div class="calendar-list-heading"><h2 id="calendarDayLabel">Selected day</h2></div>
+        <div id="calendarDayEvents" class="calendar-upcoming-list"></div>
+      </section>
+      </div>
     </div>
     <section class="white-panel calendar-upcoming"><div class="calendar-list-heading"><div><h2>Upcoming</h2><p>Your next scheduled tasks and meetings.</p></div><span class="pill-tag pill-blue" id="calendarUpcomingCount">0 ITEMS</span></div><div id="calendarUpcomingList" class="calendar-upcoming-list"></div></section>
-    <p class="asset-storage-note">Calendar items are saved in this browser for this account. Keep BrandWise open to receive scheduled reminders.</p>
+    <p class="asset-storage-note">Reminders are shared within the active workspace. Keep BrandWise open to receive scheduled notifications.</p>
   </main>
 
   <main class="page-shell" id="view-team" hidden>
@@ -1713,7 +1935,6 @@ html[data-signed-in] #accountGate, #accountGate [hidden] { display: none !import
         <span class="spec-badge">ℹ AI review is optional and not accuracy-calibrated</span>
       </div>
     </div>
-
     <!-- Content to Check vs Audit Report (Split Grid) -->
     <div class="workspace-split">
       <!-- 01 Content to Check -->
@@ -1814,9 +2035,9 @@ html[data-signed-in] #accountGate, #accountGate [hidden] { display: none !import
           </section>
         </div>
 
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding-top:12px;border-top:1px solid var(--line);font-size:11px;color:var(--text-dim);">
+        <div class="audit-report-footer">
           <span id="analysisTimingLabel">⚡ Audit request timing appears after analysis</span>
-          <button type="button" class="btn-pill-ghost" style="padding:4px 10px;font-size:10px;" id="btnExportPDF">EXPORT PDF</button>
+          <button type="button" class="btn-pill-ghost" id="btnExportPDF" disabled>EXPORT PDF</button>
         </div>
       </div>
     </div>
@@ -1846,7 +2067,7 @@ html[data-signed-in] #accountGate, #accountGate [hidden] { display: none !import
           <span class="pill-tag pill-blue">Source of Truth</span>
           <span class="pill-tag pill-gray">Updated 2d ago</span>
         </div>
-        <h1>OFFICIAL GUIDELINES</h1>
+        <h1 class="spaced-page-title">OFFICIAL GUIDELINES</h1>
         <p>Your approved facts, core messaging rules, and legal guardrails in one playful spot.</p>
       </div>
       <div style="display:flex;gap:8px;">
@@ -2001,7 +2222,7 @@ html[data-signed-in] #accountGate, #accountGate [hidden] { display: none !import
           <button type="button" class="pill-tag pill-gray" id="subtab-hist-agency">● AGENCY BENCHMARKS</button>
           <button type="button" class="pill-tag pill-gray" id="subtab-hist-impact">● IMPACT METRICS</button>
         </div>
-        <h1>AUDIT HISTORY &amp; INSIGHTS</h1>
+        <h1 class="spaced-page-title">AUDIT HISTORY &amp; INSIGHTS</h1>
         <p>Track past creative audits, monitor the compliance drift, and zap issues before campaigns launch to market.</p>
       </div>
       <div style="display:flex;gap:8px;align-items:center;">
@@ -2237,7 +2458,7 @@ html[data-signed-in] #accountGate, #accountGate [hidden] { display: none !import
           <span class="pill-tag pill-orange">SETTINGS ACTIVE</span>
           <span class="pill-tag pill-blue">APPLIED TO NEXT AUDIT</span>
         </div>
-        <h1>WORKSPACE SETTINGS</h1>
+        <h1 class="spaced-page-title">WORKSPACE SETTINGS</h1>
         <p>Personalize your brand intelligence workspace, strictness parameters, and audit dispatch triggers.</p>
       </div>
       <div style="display:flex;align-items:center;gap:8px;background:var(--card-bg);border:1px solid var(--line);padding:8px 16px;border-radius:var(--radius-md);">
@@ -3004,9 +3225,7 @@ async function saveCalendar() { return saveCompanyCollection('/api/company-data/
 async function loadCalendar() {
   try { const result = await accountRequest('/api/company-data/calendar-events'); calendarEvents = Array.isArray(result.items) ? result.items : []; }
   catch { calendarEvents = readLocalList(localKey('calendar-events')); }
-  calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-  calendarSelectedDate = dateKey(new Date());
-  renderCalendar();
+  selectCalendarDate(new Date());
   processCalendarNotifications();
 }
 async function loadWorkspaceProfile() {
@@ -3071,80 +3290,180 @@ $('#createWorkspaceInviteButton').onclick = async () => {
     status.textContent = `Invitation code ${result.code} is bound to ${result.email}; share it with that teammate.`;
   } catch (error) { status.textContent = error.message; }
 };
+const calendarTypeButtons = $$('[data-calendar-type]');
+let calendarSaving = false;
+let lastSavedCalendarEvent = null;
+
 function renderCalendar() {
   if (!$('#calendarDays')) return;
   const year = calendarMonth.getFullYear(), month = calendarMonth.getMonth();
   $('#calendarMonthLabel').textContent = calendarMonth.toLocaleDateString(undefined, {month:'long', year:'numeric'});
   const first = new Date(year, month, 1), offset = (first.getDay()+6)%7;
+  const last = new Date(year, month+1, 0);
+  const formatDate = day => day.toLocaleDateString(undefined, {month:'short', day:'numeric'});
+  $('#calendarMonthRange').textContent = `${formatDate(first)} – ${formatDate(last)}, ${year}`;
   const start = new Date(year, month, 1-offset);
   const today = dateKey(new Date());
+  const type = calendarTypeButtons.find(button => button.getAttribute('aria-pressed') === 'true').dataset.calendarType;
+  const query = $('#calendarSearch').value.trim().toLowerCase();
+  const eventsByDate = new Map();
+  const matching = calendarEvents.filter(item =>
+    (!type || item.type === type) && `${item.title} ${item.notes || ''}`.toLowerCase().includes(query)
+  ).sort((a,b) => eventDateTime(a)-eventDateTime(b));
+  for (const item of matching) {
+    if (!eventsByDate.has(item.date)) eventsByDate.set(item.date, []);
+    eventsByDate.get(item.date).push(item);
+  }
+  const monthCount = matching.filter(item => item.date >= dateKey(first) && item.date <= dateKey(last)).length;
+  $('#calendarMatchCount').textContent = `${monthCount} ${monthCount === 1 ? 'event' : 'events'} this month`;
   const days = $('#calendarDays'); days.replaceChildren();
-  for (let i=0;i<42;i++) {
+  for (let i=0;i<Math.ceil((offset+last.getDate())/7)*7;i++) {
     const day = new Date(start.getFullYear(), start.getMonth(), start.getDate()+i), key = dateKey(day);
-    const cell = document.createElement('button'); cell.type='button'; cell.className='calendar-day'; cell.textContent=String(day.getDate());
+    const cell = document.createElement('button');
+    cell.type = 'button';
+    cell.className = 'calendar-day';
+    cell.dataset.date = key;
+    cell.setAttribute('aria-pressed', String(key === calendarSelectedDate));
     if (day.getMonth() !== month) cell.classList.add('is-outside');
-    if (key === today) cell.classList.add('is-today');
+    if (key === today) { cell.classList.add('is-today'); cell.setAttribute('aria-current', 'date'); }
     if (key === calendarSelectedDate) cell.classList.add('is-selected');
-    const count = calendarEvents.filter(item => item.date === key).length;
-    if (count) { const badge=document.createElement('span'); badge.className='calendar-day-count'; badge.textContent=String(count); cell.append(badge); }
-    cell.setAttribute('aria-label', `${day.toLocaleDateString(undefined,{month:'long',day:'numeric',year:'numeric'})}${count ? `, ${count} item${count===1?'':'s'}`:''}`);
-    cell.onclick = () => { calendarSelectedDate=key; $('#calendarEventDate').value=key; renderCalendar(); renderCalendarUpcoming(); };
+    const events = eventsByDate.get(key) || [];
+    const visibleEvents = events.slice(0,2);
+    const savedEvent = events.find(item => item.id === lastSavedCalendarEvent);
+    if (savedEvent && !visibleEvents.includes(savedEvent)) visibleEvents[1] = savedEvent;
+    cell.innerHTML = `<span class="calendar-day-number">${day.getDate()}</span>` + visibleEvents.map(item => {
+      const time = eventDateTime(item).toLocaleTimeString(undefined, {hour:'numeric',minute:'2-digit'});
+      return `<span class="calendar-event-chip" data-type="${escapeHTML(item.type)}" title="${escapeHTML(item.title)}"><span class="calendar-chip-title">${escapeHTML(item.title)}</span><span class="calendar-chip-time">${escapeHTML(time)}</span></span>`;
+    }).join('') + (events.length > 2 ? `<span class="calendar-more">+${events.length-2} more</span>` : '');
+    const dateLabel = day.toLocaleDateString(undefined,{dateStyle:'full'});
+    cell.setAttribute('aria-label', `${dateLabel}, ${events.length} events${events.length ? ': ' + visibleEvents.map(item => item.title).join(', ') : ''}`);
+    cell.onclick = () => {
+      selectCalendarDate(day);
+      days.querySelector(`[data-date="${key}"]`)?.focus();
+      if (events.length) $('#calendarDayLabel').scrollIntoView({block:'nearest'});
+    };
     days.append(cell);
   }
+  const selectedDay = new Date(`${calendarSelectedDate}T12:00:00`);
+  $('#calendarDayLabel').textContent = selectedDay.toLocaleDateString(undefined, {weekday:'long',month:'long',day:'numeric'});
+  renderCalendarEventList($('#calendarDayEvents'), eventsByDate.get(calendarSelectedDate) || [], 'No matching events on this day.');
   renderCalendarUpcoming();
 }
+
 function renderCalendarUpcoming() {
-  const list=$('#calendarUpcomingList'); if (!list) return;
   const now=Date.now();
   const upcoming=calendarEvents.filter(item => eventDateTime(item).getTime() >= now-60000).sort((a,b)=>eventDateTime(a)-eventDateTime(b));
   $('#calendarUpcomingCount').textContent=`${upcoming.length} ITEM${upcoming.length===1?'':'S'}`;
+  renderCalendarEventList($('#calendarUpcomingList'), upcoming, 'Nothing upcoming. Add a reminder or meeting above.');
+}
+
+function renderCalendarEventList(list, events, emptyMessage) {
   list.replaceChildren();
-  if (!upcoming.length) { const empty=document.createElement('div'); empty.className='calendar-event-empty'; empty.textContent='Nothing scheduled yet. Add a reminder or meeting above.'; list.append(empty); return; }
-  upcoming.forEach(item => {
+  if (!events.length) { const empty=document.createElement('div'); empty.className='calendar-event-empty'; empty.textContent=emptyMessage; list.append(empty); return; }
+  events.forEach(item => {
     const row=document.createElement('article'); row.className='calendar-event-row';
     const date=document.createElement('div'); date.className='calendar-event-date'; date.textContent=eventDateTime(item).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
     const detail=document.createElement('div'); const title=document.createElement('div'); title.className='calendar-event-title'; title.textContent=item.title;
     const meta=document.createElement('div'); meta.className='calendar-event-detail'; meta.textContent=`${item.type}${item.notes ? ` · ${item.notes}`:''}${item.notify ? ' · Reminder on':''}`; detail.append(title,meta);
     const remove=document.createElement('button'); remove.type='button'; remove.className='btn-pill-ghost'; remove.textContent='Remove';
-    remove.onclick=async()=>{const previous=calendarEvents;calendarEvents=calendarEvents.filter(entry=>entry.id!==item.id);if(await saveCalendar())renderCalendar();else calendarEvents=previous;};
+    remove.onclick = async () => {
+      if (calendarSaving) return;
+      calendarSaving = true;
+      remove.disabled = true;
+      const remaining = calendarEvents.filter(entry => entry.id !== item.id);
+      try {
+        await accountRequest('/api/company-data/calendar-events', {items:remaining});
+        calendarEvents = remaining;
+        renderCalendar();
+      } catch (error) {
+        toast(error.message || 'Could not remove the calendar event.');
+      } finally {
+        calendarSaving = false;
+        remove.disabled = false;
+      }
+    };
     row.append(date,detail,remove); list.append(row);
   });
 }
-$('#calendarPrevMonth').onclick=()=>{calendarMonth=new Date(calendarMonth.getFullYear(),calendarMonth.getMonth()-1,1);renderCalendar();};
-$('#calendarNextMonth').onclick=()=>{calendarMonth=new Date(calendarMonth.getFullYear(),calendarMonth.getMonth()+1,1);renderCalendar();};
-$('#calendarToday').onclick=()=>{calendarMonth=new Date(new Date().getFullYear(),new Date().getMonth(),1);calendarSelectedDate=dateKey(new Date());$('#calendarEventDate').value=calendarSelectedDate;renderCalendar();};
+function selectCalendarDate(day) {
+  calendarMonth = new Date(day.getFullYear(), day.getMonth(), 1);
+  calendarSelectedDate = dateKey(day);
+  $('#calendarEventDate').value = calendarSelectedDate;
+  renderCalendar();
+}
+$('#calendarPrevMonth').onclick = () => selectCalendarDate(new Date(calendarMonth.getFullYear(),calendarMonth.getMonth()-1,1));
+$('#calendarNextMonth').onclick = () => selectCalendarDate(new Date(calendarMonth.getFullYear(),calendarMonth.getMonth()+1,1));
+$('#calendarToday').onclick = () => selectCalendarDate(new Date());
+$('#calendarAddReminder').onclick = () => $('#calendarEventTitle').focus();
+$('#calendarSearch').oninput = renderCalendar;
+calendarTypeButtons.forEach(button => {
+  button.onclick = () => {
+    calendarTypeButtons.forEach(option => option.setAttribute('aria-pressed', String(option === button)));
+    renderCalendar();
+  };
+});
 async function requestReminderPermission() {
   if (!('Notification' in window)) { $('#calendarNotificationStatus').textContent='This browser does not support desktop notifications. In-app reminders will still be saved.'; return false; }
-  const permission=Notification.permission==='default' ? await Notification.requestPermission() : Notification.permission;
+  const permission=Notification.permission==='default' ? await Notification.requestPermission().catch(() => 'denied') : Notification.permission;
   $('#calendarNotificationStatus').textContent=permission==='granted' ? 'Browser notifications are enabled for reminders.' : 'Notifications are blocked. Reminders will remain visible in the calendar while the app is open.';
   return permission==='granted';
 }
 $('#enableCalendarNotifications').onclick=()=>requestReminderPermission();
 $('#calendarEventForm').onsubmit=async event=>{
   event.preventDefault();
+  if (calendarSaving) return;
+  const form = event.currentTarget;
+  const button = form.querySelector('[type="submit"]');
+  const status = $('#calendarFormStatus');
   const notify=$('#calendarEventNotify').checked;
-  if (notify && 'Notification' in window && Notification.permission==='default') await requestReminderPermission();
   const item={id:globalThis.crypto?.randomUUID?.() || String(Date.now()),title:$('#calendarEventTitle').value.trim(),type:$('#calendarEventType').value,
     date:$('#calendarEventDate').value,time:$('#calendarEventTime').value,notes:$('#calendarEventNotes').value.trim(),notify,notified:false};
-  if (!item.title || !item.date || !item.time) return;
-  if (eventDateTime(item).getTime()<Date.now()) { $('#calendarFormStatus').textContent='Choose a future date and time.'; return; }
-  calendarEvents.push(item);
-  if (!await saveCalendar()) { calendarEvents.pop(); $('#calendarFormStatus').textContent='Could not save the reminder. Your calendar was not changed.'; return; }
-  calendarSelectedDate=item.date; calendarMonth=new Date(`${item.date}T12:00:00`); renderCalendar();
-  $('#calendarEventForm').reset(); $('#calendarEventNotify').checked=true; $('#calendarEventDate').value=dateKey(new Date());
-  const next=new Date(Date.now()+3600000); $('#calendarEventTime').value=`${String(next.getHours()).padStart(2,'0')}:${String(next.getMinutes()).padStart(2,'0')}`;
-  $('#calendarFormStatus').textContent='Reminder saved to the shared company calendar.'; setTimeout(()=>$('#calendarFormStatus').textContent='',3000);
+  if (!item.title) { status.textContent = 'Enter a reminder title.'; return; }
+  if (!(eventDateTime(item).getTime() > Date.now())) { status.textContent='Choose a future date and time.'; return; }
+  calendarSaving = true;
+  button.disabled = true;
+  status.textContent = 'Saving reminder…';
+  try {
+    const items = [...calendarEvents, item];
+    await accountRequest('/api/company-data/calendar-events', {items});
+    calendarEvents = items;
+    lastSavedCalendarEvent = item.id;
+    form.reset();
+    const next = new Date(Date.now()+3600000);
+    $('#calendarEventTime').value = `${String(next.getHours()).padStart(2,'0')}:${String(next.getMinutes()).padStart(2,'0')}`;
+    $('#calendarSearch').value = '';
+    calendarTypeButtons.forEach(option => option.setAttribute('aria-pressed', String(!option.dataset.calendarType)));
+    selectCalendarDate(new Date(`${item.date}T12:00:00`));
+    status.textContent = 'Reminder saved to the shared company calendar.';
+    toast('Reminder saved');
+    $('#calendarDays').querySelector(`[data-date="${item.date}"]`)?.scrollIntoView({block:'center', inline:'nearest'});
+  } catch (error) {
+    status.textContent = error.message || 'Could not save the reminder. Please try again.';
+  } finally {
+    calendarSaving = false;
+    button.disabled = false;
+  }
 };
-function processCalendarNotifications() {
+async function processCalendarNotifications() {
+  if (calendarSaving) return;
   const now=Date.now(); let changed=false;
   calendarEvents.forEach(item=>{
     const due=eventDateTime(item).getTime();
     if (!item.notify || item.notified || due>now || now-due>30*60*1000) return;
     item.notified=true; changed=true;
-    if ('Notification' in window && Notification.permission==='granted') new Notification(`BrandWise ${item.type.toLowerCase()}`,{body:item.title,tag:`brandwise-${item.id}`});
-    else toast(`Reminder: ${item.title}`);
+    try {
+      if (!('Notification' in window) || Notification.permission !== 'granted') {
+        toast(`Reminder: ${item.title}`);
+      } else {
+        new Notification(`BrandWise ${item.type.toLowerCase()}`,{body:item.title,tag:`brandwise-${item.id}`});
+      }
+    } catch { toast(`Reminder: ${item.title}`); }
   });
-  if(changed){saveCalendar();renderCalendar();}
+  if (changed) {
+    calendarSaving = true;
+    try { await saveCalendar(); }
+    finally { calendarSaving = false; }
+  }
 }
 $('#calendarEventDate').value=calendarSelectedDate;
 const initialReminderTime=new Date(Date.now()+3600000);
@@ -3531,6 +3850,7 @@ $('#btnAuditContent').onclick = async () => {
 };
 
 function renderAuditReport(res) {
+  $('#btnExportPDF').disabled = !res || !Array.isArray(res.findings) || !Number.isFinite(Number(res.score));
   if (Number.isFinite(Number(res.clientRoundTripMs))) {
     $('#analysisTimingLabel').textContent = `Audit API round-trip: ${Math.round(Number(res.clientRoundTripMs))} ms (browser ↔ server)`;
   } else {
@@ -3756,6 +4076,7 @@ function startNewAudit() {
   $('#auditTitleInput').value = '';
   $('#draftImportStatus').textContent = 'Paste or import a draft to begin. Imported text is shown here before checks.';
   currentAuditRecord = null;
+  $('#btnExportPDF').disabled = true;
   rememberUnsavedDraft(true);
   $('#reportConfidenceVal').textContent = '—';
   $('#reportComplianceVal').textContent = 'No audit results yet';
@@ -3856,14 +4177,64 @@ $('#btnIndianEnglishNote').onclick = (e) => {
 };
 
 // -------------------------------------------------------------------------
-// Export PDF Handler
+// Export a focused, print-ready report instead of printing the whole app.
 // -------------------------------------------------------------------------
-$('#btnExportPDF').onclick = () => {
-  window.print();
-};
-$('#btnPrintReportBtn').onclick = () => {
-  window.print();
-};
+function exportAuditPDF() {
+  const audit = currentAuditRecord;
+  if (!audit || !Array.isArray(audit.findings) || !Number.isFinite(Number(audit.score))) {
+    toast('Run or open a saved audit before exporting its report.');
+    return;
+  }
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    toast('Allow pop-ups to open the print-ready report.');
+    return;
+  }
+  const safe = escapeHTML;
+  const findings = audit.findings;
+  const findingCards = findings.length ? findings.map((finding, index) => {
+    const severity = String(finding.severity || 'Needs review');
+    const severityClass = /critical|high/i.test(severity) ? 'high' : /medium/i.test(severity) ? 'medium' : 'low';
+    const state = finding.state || (/expired|unrelated|missing|needs human/i.test(`${finding.verification || ''} ${finding.citationIssue || ''}`) ? 'Needs human review' : 'Review evidence before publication');
+    return `<article class="finding ${severityClass}">
+      <div class="finding-head"><div><span class="eyebrow">FINDING ${String(index + 1).padStart(2, '0')}</span><h3>${safe(finding.title || finding.category || 'Review finding')}</h3></div><span class="severity ${severityClass}">${safe(severity)}</span></div>
+      <p>${safe(finding.why || 'Review this wording against the approved brand guidance.')}</p>
+      ${finding.wrong ? `<div class="label">Flagged wording</div><blockquote>${safe(finding.wrong)}</blockquote>` : ''}
+      <div class="finding-meta"><div><span class="label">Source</span><b>${safe(finding.sourceId || 'No source linked')}</b></div><div><span class="label">Review status</span><b>${safe(state)}</b></div></div>
+      ${finding.official ? `<div class="evidence"><span class="label">Evidence reference</span><p>${safe(finding.official)}</p></div>` : ''}
+      <div class="fix"><span class="label">Suggested correction</span><p>${safe(finding.fix || 'No supported automatic correction. Confirm with a reviewer.')}</p></div>
+      ${finding.actionStatus ? `<div class="disposition">Disposition: ${safe(finding.actionStatus)}</div>` : ''}
+    </article>`;
+  }).join('') : '<div class="empty">No findings were returned for this audit. This is not a guarantee of full compliance; a person should review the draft before publication.</div>';
+  const generatedAt = new Date().toLocaleString();
+  const status = audit.status || (audit.passedThreshold ? 'Threshold met' : 'Review needed');
+  const channel = audit.channel || audit.type || 'Content review';
+  const aiMethod = audit.aiStatus || 'Deterministic rules';
+  const draft = audit.content || '';
+  const title = audit.title || 'Untitled audit';
+  const score = Math.max(0, Math.min(100, Number(audit.score) || 0));
+  const threshold = Number(audit.passingThreshold || 80);
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${safe(title)} · BrandWise Audit</title>
+    <style>
+      @page{size:A4;margin:16mm 15mm 18mm}*{box-sizing:border-box}body{margin:0;color:#142b46;background:#fff;font:14px/1.55 Inter,Arial,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .topline{height:8px;background:linear-gradient(90deg,#0878ce 0 72%,#f36b21 72%)}header{padding:23px 0 18px;border-bottom:1px solid #d8e1ee;display:flex;justify-content:space-between;align-items:center;gap:18px}.brand{font-size:19px;font-weight:900;letter-spacing:.13em;color:#0878ce}.brand small{display:block;color:#6b7f99;font-size:9px;letter-spacing:.16em;margin-top:2px}.report-label{text-align:right;color:#6b7f99;font-size:10px;font-weight:700;letter-spacing:.1em}
+      .intro{padding:25px 0 18px}.eyebrow,.label{font-size:9px;line-height:1.3;letter-spacing:.09em;font-weight:800;color:#71839c;text-transform:uppercase}.intro h1{font-size:28px;line-height:1.12;margin:6px 0 4px;letter-spacing:-.035em}.sub{margin:0;color:#637895}.chips{display:flex;gap:7px;flex-wrap:wrap;margin-top:13px}.chip{display:inline-block;background:#eaf3fc;color:#0878ce;border-radius:999px;padding:5px 10px;font-size:10px;font-weight:800}
+      .summary{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin:3px 0 22px}.metric{border:1px solid #d8e1ee;border-radius:12px;padding:12px 14px;background:#f7f9fc;min-height:76px}.metric b{display:block;font-size:23px;line-height:1.1;margin-top:5px}.metric small{display:block;color:#6b7f99;font-size:10px;margin-top:4px}.section-title{display:flex;align-items:end;justify-content:space-between;border-bottom:2px solid #0878ce;padding-bottom:7px;margin:20px 0 11px}.section-title h2{font-size:16px;margin:0}.section-title span{font-size:10px;color:#6b7f99}
+      .draft{white-space:pre-wrap;overflow-wrap:anywhere;background:#f7f9fc;border:1px solid #d8e1ee;border-left:3px solid #0878ce;border-radius:8px;padding:13px 15px;margin:0;color:#263d59;font-size:12px}.finding{break-inside:avoid;border:1px solid #d8e1ee;border-left:4px solid #0878ce;border-radius:10px;padding:13px 14px;margin:10px 0}.finding.high{border-left-color:#e75a43}.finding.medium{border-left-color:#ef9b25}.finding.low{border-left-color:#0878ce}.finding-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.finding h3{font-size:14px;line-height:1.3;margin:3px 0 5px}.finding>p{margin:4px 0 10px;color:#536b88}.severity{flex:none;border-radius:999px;padding:4px 9px;background:#eaf3fc;color:#0878ce;font-size:9px;font-weight:800;text-transform:uppercase}.severity.high{background:#fff0ed;color:#bd4033}.severity.medium{background:#fff5e4;color:#9c6200}.finding blockquote{margin:5px 0 11px;padding:8px 11px;background:#f7f9fc;border-radius:6px;border-left:2px solid #f36b21;color:#243c59}.finding-meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:9px 0;border-top:1px solid #edf1f6}.finding-meta b{display:block;margin-top:3px;font-size:11px}.evidence,.fix{padding:9px 10px;border-radius:7px;margin-top:7px;background:#f7f9fc}.fix{background:#eef6fd}.evidence p,.fix p{margin:4px 0 0;color:#425a78}.disposition{font-size:10px;color:#60748f;margin-top:8px}.empty{padding:18px;border:1px dashed #b9c9dc;border-radius:9px;color:#637895}
+      footer{margin-top:24px;border-top:1px solid #d8e1ee;padding-top:10px;display:flex;justify-content:space-between;gap:12px;color:#71839c;font-size:9px}.no-print{position:sticky;top:0;background:#142b46;color:white;padding:10px 16px;text-align:center;font-size:12px}.no-print button{margin-left:12px;border:0;border-radius:999px;padding:8px 14px;font-weight:700;color:#142b46;background:white;cursor:pointer}@media print{.no-print{display:none}header{padding-top:0}}
+    </style></head><body><div class="no-print">Print-ready audit report <button onclick="window.print()">Print / Save as PDF</button></div><div class="topline"></div>
+    <main><header><div class="brand">BRANDWISE<small>BRAND INTELLIGENCE</small></div><div class="report-label">AUDIT REPORT<br>${safe(generatedAt)}</div></header>
+      <section class="intro"><div class="eyebrow">CONTENT COMPLIANCE REVIEW</div><h1>${safe(title)}</h1><p class="sub">A review of ${safe(channel)} against the configured BrandWise guidance.</p><div class="chips"><span class="chip">${safe(status)}</span><span class="chip">${safe(aiMethod)}</span>${audit.settings?.strictness ? `<span class="chip">${safe(audit.settings.strictness)} review</span>` : ''}</div></section>
+      <section class="summary"><div class="metric"><span class="eyebrow">COMPLIANCE SCORE</span><b>${score}%</b><small>Configured passing threshold: ${safe(threshold)}%</small></div><div class="metric"><span class="eyebrow">FINDINGS</span><b>${findings.length}</b><small>${findings.filter(f => !['accepted','edited','dismissed'].includes(f.actionStatus)).length} pending disposition</small></div><div class="metric"><span class="eyebrow">REVIEW STATUS</span><b style="font-size:16px;margin-top:9px">${safe(status)}</b><small>Human review remains part of the workflow</small></div></section>
+      <section><div class="section-title"><h2>Draft reviewed</h2><span>${draft.length.toLocaleString()} characters</span></div><div class="draft">${safe(draft || 'No saved draft text is available.')}</div></section>
+      <section><div class="section-title"><h2>Findings and recommendations</h2><span>${findings.length} total</span></div>${findingCards}</section>
+      <footer><span>BrandWise · Explainable brand review</span><span>Generated ${safe(generatedAt)} · Review findings with a qualified human before publication.</span></footer></main></body></html>`;
+  printWindow.document.open();
+  printWindow.document.write(html);
+  printWindow.document.close();
+}
+$('#btnExportPDF').onclick = exportAuditPDF;
+$('#btnPrintReportBtn').onclick = exportAuditPDF;
 
 // -------------------------------------------------------------------------
 // Audit Archive "View Report" Modal
@@ -4313,55 +4684,87 @@ function escapeHTML(str) {
 }
 
 
-// Keep animated decorations outside the actual form and preview-card bounds.
-let authIconFrame;
+// Scatter decorative icons in the open space around each section's content.
 function arrangeAuthIcons() {
-  cancelAnimationFrame(authIconFrame);
-  authIconFrame = requestAnimationFrame(() => {
-    const gate = document.querySelector('#accountGate');
-    const icons = [...gate.querySelectorAll('.auth-features > span')];
-    icons.forEach(icon => { icon.style.display = 'none'; });
-    if (document.documentElement.hasAttribute('data-signed-in')) return;
-    const obstacles = [gate]
-      .filter(element => getComputedStyle(element).display !== 'none')
-      .map(element => element.getBoundingClientRect());
-    const size = Math.min(66, Math.max(30, innerWidth * .042));
-    const positions = [];
-    // Repeatable random placement keeps icons scattered and clear of each other.
-    let scatterSeed = 47291;
-    const randomOffset = () => {
-      scatterSeed = (Math.imul(scatterSeed, 1664525) + 1013904223) >>> 0;
-      return scatterSeed / 4294967296;
-    };
-    const edge = 20;
-    for (let attempt = 0; attempt < 800 && positions.length < icons.length; attempt++) {
-      const x = edge + randomOffset() * Math.max(0, innerWidth - size - edge * 2);
-      const y = edge + randomOffset() * Math.max(0, innerHeight - size - edge * 2);
-      const overlapsForm = obstacles.some(rect =>
-        x < rect.right + 26 && x + size > rect.left - 26 &&
-        y < rect.bottom + 26 && y + size > rect.top - 26);
-      const overlapsIcon = positions.some(position =>
-        Math.hypot(x - position.x, y - position.y) < size * 1.6 + 20);
-      if (!overlapsForm && !overlapsIcon) positions.push({ x, y });
+  const overview = document.getElementById('authOverview');
+  const stage = document.getElementById('authSignInStage');
+  const gate = document.getElementById('accountGate');
+  const header = document.getElementById('authPageHeader');
+
+  for (const section of [overview, stage]) {
+    const layer = section.querySelector('.auth-features');
+    const bounds = layer.getBoundingClientRect();
+    if (!bounds.width || !bounds.height) continue;
+
+    const panels = section === stage ? [gate] : section.querySelectorAll(
+      '.auth-overview-intro, .auth-demo, #authFeatureSummary, .auth-overview-grid, .auth-overview-cta'
+    );
+    const panelBounds = [...panels].map(panel => panel.getBoundingClientRect());
+    const size = parseFloat(getComputedStyle(layer.firstElementChild).width);
+    const clearance = 18;
+    const step = size + 48;
+    const topInset = section === overview ? header.getBoundingClientRect().height + 18 : 36;
+    const bottomInset = section === overview ? 36 : 24;
+    const pairs = [];
+
+    const clearsPanels = ({ x, y }) => !panelBounds.some(panel =>
+      bounds.left + x < panel.right + clearance &&
+      bounds.left + x + size > panel.left - clearance &&
+      bounds.top + y < panel.bottom + clearance &&
+      bounds.top + y + size > panel.top - clearance
+    );
+
+    for (let row = 0, y = topInset; y + size + bottomInset <= bounds.height; row++, y += step) {
+      const inset = clearance + (row % 2) * Math.round(step / 4);
+      const lastLeft = (bounds.width - size - step) / 2;
+      for (let column = 0, x = inset; x <= lastLeft; column++, x += step) {
+        const offsetY = y + ((row + column) % 3) * 6;
+        const left = { x, y: offsetY };
+        const right = { x: bounds.width - size - x, y: offsetY + 7 };
+        if (right.y + size + bottomInset <= bounds.height && clearsPanels(left) && clearsPanels(right)) {
+          pairs.push([left, right]);
+        }
+      }
     }
-    const count = Math.min(icons.length, positions.length);
-    for (let index = 0; index < count; index++) {
-      const position = positions[Math.floor(index * positions.length / count)];
-      Object.assign(icons[index].style, {
-        display: 'block', left: `${position.x}px`, top: `${position.y}px`,
-        rotate: `${Math.sin(index * 2.4) * 18}deg`
-      });
+
+    const pairCount = Math.min(Math.floor(layer.children.length / 2), pairs.length);
+    const slots = [];
+    for (let index = 0; index < pairCount; index++) {
+      slots.push(...pairs[Math.floor((index + 0.5) * pairs.length / pairCount)]);
     }
-  });
+    const rotations = [-10, 9, 7, -8, -6, 6];
+    [...layer.children].forEach((icon, index) => {
+      const slot = slots[index];
+      icon.classList.toggle('is-positioned', Boolean(slot));
+      if (!slot) return;
+      icon.style.left = slot.x + 'px';
+      icon.style.top = slot.y + 'px';
+      icon.style.setProperty('--icon-rot', rotations[index % rotations.length] + 'deg');
+    });
+  }
 }
-new ResizeObserver(arrangeAuthIcons).observe(document.querySelector('#accountGate'));
-new MutationObserver(arrangeAuthIcons).observe(document.querySelector('#accountGate'), {
-  attributes: true, attributeFilter: ['data-registering']
-});
-window.addEventListener('resize', arrangeAuthIcons);
-window.addEventListener('scroll', arrangeAuthIcons, { passive: true });
-document.fonts.ready.then(arrangeAuthIcons);
+
+const authIconObserver = new ResizeObserver(arrangeAuthIcons);
+for (const id of ['authOverview', 'authSignInStage', 'accountGate', 'authPageHeader']) {
+  authIconObserver.observe(document.getElementById(id));
+}
 arrangeAuthIcons();
+
+const authDemoCopy = $('#authDemoCopy');
+const authDemoResult = $('#authDemoResult');
+const authDemoOriginalCopy = authDemoCopy.innerHTML;
+const authDemoOriginalResult = authDemoResult.innerHTML;
+$('#authDemoToggle').onclick = event => {
+  const revised = authDemoResult.toggleAttribute('data-revised');
+  if (revised) {
+    authDemoCopy.textContent = 'Our product helps teams get started with a guided onboarding process.';
+    authDemoResult.innerHTML = '<strong>Numeric guarantee removed</strong><p>Check the revised wording against your guidelines before publishing.</p>';
+  } else {
+    authDemoCopy.innerHTML = authDemoOriginalCopy;
+    authDemoResult.innerHTML = authDemoOriginalResult;
+  }
+  event.currentTarget.textContent = revised ? 'Show original draft' : 'Preview suggested edit';
+};
 
 const accountForm = $('#accountForm');
 const registrationFields = $('#registrationFields');
@@ -4968,6 +5371,7 @@ async function initializeAccount() {
   $('#roleScopeTag').style.display = 'none';
   $('#view-settings').querySelector('#keyGemini').closest('.white-panel').hidden = user.role !== 'Admin';
   document.documentElement.dataset.signedIn = 'true';
+  window.scrollTo(0, 0);
   accountForm.reset();
   await loadAuditPreferences();
   if (user.role === 'Admin') loadKeys();

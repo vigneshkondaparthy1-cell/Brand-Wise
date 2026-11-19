@@ -6,6 +6,7 @@ import threading
 import time
 import os
 import json
+import gzip
 import re
 import urllib.parse
 import urllib.request
@@ -25,6 +26,8 @@ INSIGHTS_DB = ROOT / 'insights-data.json'
 AUDIT_PREFERENCES_DB = ROOT / 'workspace-audit-preferences.json'
 ENV_FILE = ROOT / '.env'
 PAGE = 'The-Final-Draft-Hackathon-Updated.html'
+PAGE_CACHE = {}
+PAGE_CACHE_LOCK = threading.Lock()
 OTP_REQUESTS = {}
 OTP_REQUESTS_LOCK = threading.Lock()
 OTP_REQUEST_WINDOW_SECONDS = 600
@@ -1295,9 +1298,19 @@ class Handler(BaseHTTPRequestHandler):
             if not target_file.exists():
                 target_file = ROOT / 'index.html'
             if target_file.exists():
-                body = target_file.read_bytes()
+                stamp = target_file.stat().st_mtime_ns
+                with PAGE_CACHE_LOCK:
+                    if PAGE_CACHE.get('stamp') != stamp or PAGE_CACHE.get('path') != target_file:
+                        body = target_file.read_bytes()
+                        PAGE_CACHE.update(path=target_file, stamp=stamp, plain=body,
+                                          gzip=gzip.compress(body, compresslevel=6))
+                    compressed = 'gzip' in self.headers.get('Accept-Encoding', '').lower()
+                    body = PAGE_CACHE['gzip' if compressed else 'plain']
                 self.send_response(200)
                 self.send_header('Content-Type', 'text/html; charset=utf-8')
+                self.send_header('Vary', 'Accept-Encoding')
+                if compressed:
+                    self.send_header('Content-Encoding', 'gzip')
                 self.send_header('Content-Length', str(len(body)))
                 self.send_header('X-Content-Type-Options', 'nosniff')
                 self.send_header('X-Frame-Options', 'DENY')
