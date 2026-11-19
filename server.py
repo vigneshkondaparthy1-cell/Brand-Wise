@@ -780,7 +780,7 @@ def run_brandwise_checks(content, channel="Website Copy", reference=None, strict
             if not phrase:
                 continue
             for match in re.finditer(re.escape(phrase), content, re.I):
-                if any(f.get("wrong", "").casefold() == match.group(0).casefold() for f in findings):
+                if any(f.get("location") == f"Offset {match.start()}..{match.end()}" for f in findings):
                     continue
                 active = claim.get("status") == "Active" and claim.get("expiry", "") >= datetime.now(timezone.utc).date().isoformat()
                 findings.append({
@@ -809,11 +809,11 @@ def run_brandwise_checks(content, channel="Website Copy", reference=None, strict
     ]
     for match in re.finditer(r'\$\s*(\d+(?:\.\d{1,2})?)\s*(?:/\s*(?:seat|user|month|mo|year|yr)|per\s+(?:seat|user|month|year))?', content, re.I):
         amount = match.group(1)
-        if any(amount in re.findall(r'\d+(?:\.\d+)?', claim.get('statement', '')) for claim in active_pricing):
+        if any(amount in re.findall(r'\$\s*(\d+(?:\.\d{1,2})?)', claim.get('statement', '')) for claim in active_pricing):
             continue
         if any(f.get('wrong', '').casefold() == match.group(0).casefold() for f in findings):
             continue
-        expired_match = next((claim for claim in claims if 'pricing' in claim.get('category', '').casefold() and claim.get('status') != 'Active' and amount in re.findall(r'\d+(?:\.\d+)?', claim.get('statement', ''))), None)
+        expired_match = next((claim for claim in claims if 'pricing' in claim.get('category', '').casefold() and claim.get('status') != 'Active' and amount in re.findall(r'\$\s*(\d+(?:\.\d{1,2})?)', claim.get('statement', ''))), None)
         findings.append({
             'id': f"FND-PRICE-{len(findings)+1}",
             'location': f"Offset {match.start()}..{match.end()}",
@@ -837,8 +837,8 @@ def run_brandwise_checks(content, channel="Website Copy", reference=None, strict
                            if 'company identity' in claim.get('category', '').casefold()
                            and claim.get('status') == 'Active'
                            and claim.get('expiry', '') >= datetime.now(timezone.utc).date().isoformat()), None)
-    identity_year_match = re.search(r'\b(?:18|19|20)\d{2}\b', identity_claim.get('statement', '')) if identity_claim else None
-    identity_year = identity_year_match.group(0) if identity_year_match else None
+    identity_year_match = re.search(r'(?:founded|established|founding\s*year)\s*(?:in|—|-|:)?\s*(\b(?:18|19|20)\d{2}\b)', identity_claim.get('statement', ''), re.I) if identity_claim else None
+    identity_year = identity_year_match.group(1) if identity_year_match else None
     founding_matches = list(re.finditer(r'(?:founded|established|founding\s*year)\s*(?:in|—|-|:)?\s*(\b(?:18|19|20)\d{2}\b)', content, re.I))
     for m in founding_matches:
         year_claimed = m.group(1)
@@ -866,7 +866,7 @@ def run_brandwise_checks(content, channel="Website Copy", reference=None, strict
                               if 'product performance' in claim.get('category', '').casefold()
                               and claim.get('status') == 'Active'
                               and claim.get('expiry', '') >= datetime.now(timezone.utc).date().isoformat()), None)
-    benchmark_match = re.search(r'(\d+(?:\.\d+)?)\s*%', performance_claim.get('statement', '')) if performance_claim else None
+    benchmark_match = re.search(r'(?:cuts?|reduces?)\s+onboarding(?:\s+time)?\s+by\s+(?:up\s+to\s+)?(\d+(?:\.\d+)?)\s*%', performance_claim.get('statement', ''), re.I) if performance_claim else None
     max_supported = float(benchmark_match.group(1)) if benchmark_match else None
     perf_matches = list(re.finditer(r'cuts?\s+onboarding(?:\s+time)?\s+by\s+(\d+(?:\.\d+)?)\s*%', content, re.I))
     if max_supported is not None and performance_claim:
@@ -902,10 +902,10 @@ def run_brandwise_checks(content, channel="Website Copy", reference=None, strict
         if term == product_name.casefold():
             for bad_casing in re.finditer(r'\b' + re.escape(product_name) + r'\b', content, re.I):
                 if bad_casing.group(0) != product_name:
-                    if not any(f.get("wrong") == bad_casing.group(0) for f in findings):
+                    if not any(f.get("location") == f"Offset {bad_casing.start()}..{bad_casing.end()}" for f in findings):
                         findings.append({
                             "id": f"FND-TRM-{len(findings)+1}",
-                            "location": f"Offset {bad_casing.start()}",
+                            "location": f"Offset {bad_casing.start()}..{bad_casing.end()}",
                             "category": "Brand Consistency",
                             "title": "Brand name capitalization error",
                             "severity": "Medium",
@@ -923,12 +923,14 @@ def run_brandwise_checks(content, channel="Website Copy", reference=None, strict
                         })
             continue
 
-        if term in content_lower:
-            start_idx = content_lower.find(term)
-            actual_text = content[start_idx:start_idx+len(term)]
+        for term_match in re.finditer(re.escape(raw_term), content, re.I):
+            start_idx = term_match.start()
+            actual_text = term_match.group(0)
+            if any(f.get("location") == f"Offset {term_match.start()}..{term_match.end()}" for f in findings):
+                continue
             findings.append({
                 "id": f"FND-TRM-{len(findings)+1}",
-                "location": f"Position {start_idx}",
+                "location": f"Offset {term_match.start()}..{term_match.end()}",
                 "category": "Prohibited Terminology",
                 "title": f"Prohibited phrasing: '{actual_text}'",
                 "severity": p.get("severity", "High"),
@@ -950,7 +952,7 @@ def run_brandwise_checks(content, channel="Website Copy", reference=None, strict
     for match in re.finditer(superlatives_pattern, content, re.I):
         claim_snippet = match.group(0)
         # Check if already caught
-        if not any(f["wrong"].casefold() == claim_snippet.casefold() for f in findings):
+        if not any(f.get("location") == f"Offset {match.start()}..{match.end()}" for f in findings):
             findings.append({
                 "id": f"FND-SUP-{len(findings)+1}",
                 "location": f"Offset {match.start()}..{match.end()}",
@@ -1273,12 +1275,13 @@ class Handler(BaseHTTPRequestHandler):
                  'approvalRate': round(100 * group['approved'] / group['submissions']) if group['submissions'] else None}
                 for group in grouped_agencies.values()
             ]
-            source_linked = sum(bool(f.get('sourceId')) for f in all_findings)
+            source_linked = sum(bool(f.get('sourceId') and f.get('official') and f.get('state') == 'source-verified') for f in all_findings)
             impact_evidence = {
                 'measurementStatus': 'Saved audit counts are operational data. Detection/false-flag rates below use the checked-in synthetic labeled set and are not production benchmarks.',
                 'savedAuditCount': len(audits),
                 'savedFindingCount': len(all_findings),
                 'sourceLinkedFindingCount': source_linked,
+                'sourceLinkedDefinition': 'Findings marked source-verified with a source ID and evidence text',
                 'incorrectFlagReports': sum(bool(f.get('reportedIncorrect')) for f in all_findings),
                 'labelledEvaluation': evaluate_labelled_ruleset()
             }
@@ -1345,38 +1348,14 @@ class Handler(BaseHTTPRequestHandler):
         origin = self.headers.get('Origin')
         if origin and urllib.parse.urlparse(origin).netloc.casefold() != self.headers.get('Host', '').casefold():
             return self.send_json(403, {'error': 'Request origin is not allowed.'})
-        if path == '/api/auth/password-reset/send':
+        if path in ('/api/auth/password-reset/send', '/api/auth/password-reset',
+                    '/api/auth/send-otp', '/api/auth/verify-otp'):
+            return self.send_json(410, {'error': 'Email codes are retired. Use the Firebase email link in BrandWise.'})
+        if path == '/api/auth/firebase/password-reset':
             if not allow_otp_request(self.client_address[0]):
-                return self.send_json(429, {'error': 'Too many verification requests. Wait 10 minutes and try again.'})
+                return self.send_json(429, {'error': 'Too many reset attempts. Wait and try again.'})
             try:
-                res = accounts.send_password_reset_otp(data.get('email'))
-            except accounts.EmailDeliveryError as exc:
-                return self.send_json(503, {'error': str(exc)})
-            except ValueError as exc:
-                return self.send_json(400, {'error': str(exc)})
-            dev_code = res.get('dev_code') if isinstance(res, dict) else None
-            msg = f'Reset code: {dev_code} (Local development mode)' if dev_code else 'If an account uses that email, a reset code has been sent.'
-            return self.send_json(200, {'ok': True, 'message': msg, 'dev_code': dev_code})
-        if path == '/api/auth/password-reset':
-            try:
-                accounts.reset_password_with_email_otp(data.get('email'), data.get('code'), data.get('newPassword'))
-            except ValueError as exc:
-                return self.send_json(400, {'error': str(exc)})
-            return self.send_json(200, {'ok': True})
-        if path == '/api/auth/send-otp':
-            if not allow_otp_request(self.client_address[0]):
-                return self.send_json(429, {'error': 'Too many verification requests. Wait 10 minutes and try again.'})
-            try:
-                res = accounts.send_email_otp(data.get('email'))
-            except accounts.EmailDeliveryError as exc:
-                return self.send_json(503, {'error': str(exc)})
-            except ValueError as exc:
-                return self.send_json(400, {'error': str(exc)})
-            dev_code = res.get('dev_code') if isinstance(res, dict) else None
-            return self.send_json(200, {'ok': True, 'dev_code': dev_code})
-        if path == '/api/auth/verify-otp':
-            try:
-                accounts.verify_email_otp(data.get('email'), data.get('code'))
+                accounts.reset_password_with_firebase_token(data.get('idToken'), data.get('newPassword'))
             except ValueError as exc:
                 return self.send_json(400, {'error': str(exc)})
             return self.send_json(200, {'ok': True})
@@ -1454,6 +1433,12 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(200, accounts.update_profile(self.headers, data))
             except ValueError as exc:
                 return self.send_json(400, {'error': str(exc)})
+        if path == '/api/auth/firebase/verify-profile-email':
+            try:
+                email = accounts.verify_profile_email_with_firebase_token(self.headers, data.get('idToken'))
+            except ValueError as exc:
+                return self.send_json(400, {'error': str(exc)})
+            return self.send_json(200, {'ok': True, 'email': email})
         if path == '/api/auth/change-password':
             try:
                 accounts.change_password(self.headers, data.get('currentPassword'), data.get('newPassword'))
