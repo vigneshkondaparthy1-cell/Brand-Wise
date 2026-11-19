@@ -1403,8 +1403,8 @@ html[data-signed-in] #accountGate, #accountGate [hidden] { display: none !import
           <button class="btn-pill-ghost" id="sendEmailOtp" type="button">Verify</button>
         </div>
         <div class="email-otp-panel" id="emailOtpPanel" hidden>
-          <p>Open the Firebase verification email, follow its link, return here, then confirm.</p>
-          <div class="email-entry-row"><button class="btn-pill-primary" id="confirmEmailOtp" type="button">I verified my email</button></div>
+          <p>Enter the six-digit verification code sent to your email.</p>
+          <div class="email-entry-row"><input id="emailOtpCode" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="6-digit code"><button class="btn-pill-primary" id="confirmEmailOtp" type="button">Confirm email</button></div>
         </div>
         <p class="email-verification-status" id="emailVerificationStatus" role="status" aria-live="polite"></p>
       </div>
@@ -1419,11 +1419,20 @@ html[data-signed-in] #accountGate, #accountGate [hidden] { display: none !import
     <p id="accountError" role="status"></p>
   </form>
   <form id="forgotPasswordForm" hidden>
-    <p style="margin:0 0 4px;">Enter your account email. Firebase will send a secure password reset link if the address belongs to an account.</p>
+    <p style="margin:0 0 4px;">Enter your account email and we’ll send a password reset code.</p>
     <label for="passwordResetEmail">Email</label>
     <div class="email-entry-row">
       <input id="passwordResetEmail" type="email" required maxlength="254" autocomplete="email" placeholder="you@example.com">
-      <button class="btn-pill-ghost" id="sendPasswordResetCode" type="button">Send reset link</button>
+      <button class="btn-pill-ghost" id="sendPasswordResetCode" type="button">Send code</button>
+    </div>
+    <div id="passwordResetPanel" hidden>
+      <label for="passwordResetCode">Verification code</label>
+      <input id="passwordResetCode" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="6-digit code">
+      <label for="passwordResetNewPassword">New password</label>
+      <input id="passwordResetNewPassword" type="password" autocomplete="new-password" minlength="4" maxlength="128" placeholder="At least 4 characters">
+      <label for="passwordResetConfirmPassword">Confirm new password</label>
+      <input id="passwordResetConfirmPassword" type="password" autocomplete="new-password" minlength="4" maxlength="128">
+      <button class="btn-pill-primary" type="submit">Reset password</button>
     </div>
     <div class="reset-password-actions"><button class="btn-pill-ghost" id="backToSignIn" type="button">Back to sign in</button></div>
     <p id="forgotPasswordStatus" role="status" aria-live="polite"></p>
@@ -1578,16 +1587,23 @@ html[data-signed-in] #accountGate, #accountGate [hidden] { display: none !import
             <label for="profileCurrentPassword">Current password</label>
             <input id="profileCurrentPassword" type="password" autocomplete="current-password" minlength="1" maxlength="128" required>
             <label for="profileNewPassword">New password</label>
-            <input id="profileNewPassword" type="password" autocomplete="new-password" minlength="15" maxlength="128" required>
+            <input id="profileNewPassword" type="password" autocomplete="new-password" minlength="4" maxlength="128" required>
             <label for="profileConfirmPassword">Confirm new password</label>
-            <input id="profileConfirmPassword" type="password" autocomplete="new-password" minlength="15" maxlength="128" required>
+            <input id="profileConfirmPassword" type="password" autocomplete="new-password" minlength="4" maxlength="128" required>
             <div class="profile-password-actions"><button class="btn-pill-primary" id="saveNewPassword" type="submit">Change password</button><button class="btn-pill-ghost" id="profileForgotPassword" type="button">Forgot password?</button></div>
             <p class="profile-password-status" id="profilePasswordStatus" role="status" aria-live="polite"></p>
           </form>
           <form id="profilePasswordResetForm" class="profile-password-reset" hidden>
-            <p>Firebase sends a secure password reset link to your account email.</p>
+            <p>Verify your email with a code, then choose a new password.</p>
             <label for="profileResetEmail">Email</label>
-            <div class="email-entry-row"><input id="profileResetEmail" type="email" autocomplete="email" required maxlength="254"><button class="btn-pill-ghost" id="profileSendResetCode" type="button">Send reset link</button></div>
+            <div class="email-entry-row"><input id="profileResetEmail" type="email" autocomplete="email" required maxlength="254"><button class="btn-pill-ghost" id="profileSendResetCode" type="button">Send code</button></div>
+            <label for="profileResetCode">Verification code</label>
+            <input id="profileResetCode" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="6-digit code">
+            <label for="profileResetNewPassword">New password</label>
+            <input id="profileResetNewPassword" type="password" autocomplete="new-password" minlength="4" maxlength="128" placeholder="At least 4 characters">
+            <label for="profileResetConfirmPassword">Confirm new password</label>
+            <input id="profileResetConfirmPassword" type="password" autocomplete="new-password" minlength="4" maxlength="128">
+            <button class="btn-pill-primary" type="submit">Reset password</button>
             <div class="profile-password-actions"><button class="btn-pill-ghost" type="button" id="cancelProfilePasswordReset">Back to change password</button></div>
             <p class="profile-password-status" id="profilePasswordResetStatus" role="status" aria-live="polite"></p>
           </form>
@@ -4398,10 +4414,9 @@ async function getFirebaseAuth() {
   })();
   return firebaseAuthPromise;
 }
-let firebaseVerifiedToken = '';
 async function accountRequest(path, data) {
-  const response = await fetch(path, data === undefined ? {} : {
-    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
+  const response = await fetch(path, data === undefined ? {credentials:'same-origin'} : {
+    method: 'POST', credentials:'same-origin', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
   });
   const responseText = await response.text();
   let result;
@@ -4413,13 +4428,20 @@ async function accountRequest(path, data) {
       : `The account API returned an unreadable response (HTTP ${response.status}).`;
     throw new Error(detail);
   }
-  if (!response.ok) throw new Error(result.error || 'Account request failed.');
+  if (!response.ok) {
+    const error = new Error(result.error || 'Account request failed.');
+    error.status = response.status;
+    throw error;
+  }
   return result;
 }
 function resetEmailVerification() {
   verifiedEmail = '';
   emailOtpPanel.hidden = true;
-  firebaseVerifiedToken = '';
+  emailOtpCode.value = '';
+  emailOtpCode.disabled = false;
+  confirmEmailOtpButton.disabled = false;
+  confirmEmailOtpButton.textContent = 'Confirm email';
   sendEmailOtpButton.disabled = false;
   sendEmailOtpButton.textContent = 'Verify';
   emailVerificationStatus.textContent = '';
@@ -4432,65 +4454,55 @@ sendEmailOtpButton.onclick = async () => {
   if (!registrationEmail.reportValidity()) return;
   const email = registrationEmail.value.trim().toLowerCase();
   sendEmailOtpButton.disabled = true;
-  emailVerificationStatus.textContent = 'Creating your secure account and sending a verification link…';
+  emailVerificationStatus.textContent = 'Sending a verification code…';
   emailVerificationStatus.dataset.state = 'pending';
   try {
-    const {auth, createUserWithEmailAndPassword, sendEmailVerification} = await getFirebaseAuth();
-    const credential = await createUserWithEmailAndPassword(auth, email, accountForm.elements.password.value);
-    await sendEmailVerification(credential.user);
+    const result = await accountRequest('/api/auth/send-otp', {email});
     if (registrationEmail.value.trim().toLowerCase() !== email) {
       emailVerificationStatus.textContent = 'The email changed. Verify the current address.';
       emailVerificationStatus.dataset.state = 'error';
       return;
     }
     emailOtpPanel.hidden = false;
-    sendEmailOtpButton.textContent = 'Resend link';
-    emailVerificationStatus.textContent = `Verification link sent to ${email}. Verify there, return here, then click “I verified my email”.`;
+    emailOtpCode.disabled = false;
+    sendEmailOtpButton.textContent = 'Resend code';
+    if (result.dev_code) {
+      emailOtpCode.value = result.dev_code;
+      emailVerificationStatus.textContent = `Local development code for ${email}: ${result.dev_code}. Confirm it below.`;
+      emailOtpCode.focus();
+    } else {
+      emailOtpCode.value = '';
+      emailVerificationStatus.textContent = `A six-digit verification code was sent to ${email}. It expires in 10 minutes.`;
+      emailOtpCode.focus();
+    }
     emailVerificationStatus.dataset.state = 'success';
   } catch (error) {
-    if (error.code === 'auth/email-already-in-use') {
-      try {
-        const {auth, signInWithEmailAndPassword, sendEmailVerification} = await getFirebaseAuth();
-        const existing = await signInWithEmailAndPassword(auth, email, accountForm.elements.password.value);
-        if (existing.user.emailVerified) {
-          firebaseVerifiedToken = await existing.user.getIdToken(true);
-          verifiedEmail = email;
-          sendEmailOtpButton.textContent = 'Verified ✓';
-          sendEmailOtpButton.disabled = true;
-          emailVerificationStatus.textContent = 'Email already verified. You can finish creating your BrandWise profile.';
-          emailVerificationStatus.dataset.state = 'success';
-          return;
-        }
-        await sendEmailVerification(existing.user);
-        emailOtpPanel.hidden = false;
-        emailVerificationStatus.textContent = 'A new verification link was sent. Follow it, return here, and confirm.';
-      } catch (resumeError) {
-        emailVerificationStatus.textContent = resumeError.code === 'auth/invalid-credential'
-          ? 'That Firebase email already exists. Sign in with its password or reset it first.' : resumeError.message;
-      }
-    } else {
-      emailVerificationStatus.textContent = error.code === 'auth/weak-password' ? 'Use a password with at least 15 characters.' : error.message;
-    }
-    if (verifiedEmail !== email) emailVerificationStatus.dataset.state = 'error';
+    emailVerificationStatus.textContent = error.message;
+    emailVerificationStatus.dataset.state = 'error';
   } finally {
     sendEmailOtpButton.disabled = verifiedEmail === email;
   }
 };
+emailOtpCode.addEventListener('input', () => {
+  emailOtpCode.value = emailOtpCode.value.replace(/\D/g, '').slice(0, 6);
+});
 confirmEmailOtpButton.onclick = async () => {
   const email = registrationEmail.value.trim().toLowerCase();
+  if (!/^\d{6}$/.test(emailOtpCode.value.trim())) {
+    emailVerificationStatus.textContent = 'Enter the six-digit code from your email.';
+    emailVerificationStatus.dataset.state = 'error';
+    return;
+  }
   confirmEmailOtpButton.disabled = true;
   try {
-    const {auth, reload, getIdToken} = await getFirebaseAuth();
-    const user = auth.currentUser;
-    if (!user || user.email.toLowerCase() !== email) throw new Error('Sign in to the same Firebase email address that received the verification link.');
-    await reload(user);
-    if (!user.emailVerified) throw new Error('Firebase still shows this email as unverified. Open the latest verification email link and try again.');
-    firebaseVerifiedToken = await getIdToken(user, true);
+    await accountRequest('/api/auth/verify-otp', {email, code:emailOtpCode.value.trim()});
     verifiedEmail = email;
     emailVerificationStatus.textContent = 'Email verified. You can finish creating your account.';
     emailVerificationStatus.dataset.state = 'success';
     sendEmailOtpButton.textContent = 'Verified ✓';
     sendEmailOtpButton.disabled = true;
+    emailOtpCode.disabled = true;
+    confirmEmailOtpButton.textContent = 'Verified ✓';
   } catch (error) {
     emailVerificationStatus.textContent = error.message;
     emailVerificationStatus.dataset.state = 'error';
@@ -4507,6 +4519,13 @@ function updateRegistrationQuestions() {
 roleField.onchange = updateRegistrationQuestions;
 function setRegistration(enabled) {
   registration = enabled;
+  const identifierLabel = accountForm.querySelector('label:has(input[name="username"])');
+  if (identifierLabel) identifierLabel.firstChild.textContent = enabled ? 'Username ' : 'Username or email ';
+  if (enabled && accountForm.elements.username.value.includes('@')) {
+    const emailName = accountForm.elements.username.value.split('@')[0];
+    const suggested = emailName.toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 32);
+    accountForm.elements.username.value = suggested.length >= 3 ? suggested : '';
+  }
   $('#accountGate').toggleAttribute('data-registering', enabled);
   registrationFields.hidden = !enabled;
   registrationFields.querySelectorAll('[data-registration-field]').forEach(field => {
@@ -4514,7 +4533,7 @@ function setRegistration(enabled) {
     field.required = enabled;
   });
   accountForm.elements.password.autocomplete = enabled ? 'new-password' : 'current-password';
-  accountForm.elements.password.minLength = enabled ? 15 : 0;
+  accountForm.elements.password.minLength = enabled ? 4 : 0;
   resetEmailVerification();
   $('#accountTitle').textContent = enabled ? 'Create an account' : 'Sign in';
   $('#accountSubmit').textContent = enabled ? 'Register' : 'Sign in';
@@ -4526,11 +4545,17 @@ setRegistration(false);
 const forgotPasswordForm = $('#forgotPasswordForm');
 const passwordResetEmail = $('#passwordResetEmail');
 const passwordResetStatus = $('#forgotPasswordStatus');
+const passwordResetPanel = $('#passwordResetPanel');
+const passwordResetCode = $('#passwordResetCode');
+const passwordResetNewPassword = $('#passwordResetNewPassword');
+const passwordResetConfirmPassword = $('#passwordResetConfirmPassword');
 $('#forgotPasswordButton').onclick = () => {
   setRegistration(false);
   accountForm.hidden = true;
   forgotPasswordForm.hidden = false;
   forgotPasswordForm.reset();
+  passwordResetPanel.hidden = true;
+  [passwordResetCode, passwordResetNewPassword, passwordResetConfirmPassword].forEach(field => { field.required = false; });
   passwordResetStatus.textContent = '';
   passwordResetStatus.removeAttribute('data-state');
   $('#accountTitle').textContent = 'Reset password';
@@ -4547,12 +4572,19 @@ $('#sendPasswordResetCode').onclick = async () => {
   if (!passwordResetEmail.reportValidity()) return;
   const button = $('#sendPasswordResetCode');
   button.disabled = true;
-  passwordResetStatus.textContent = 'Sending a secure password reset link…';
+  passwordResetStatus.textContent = 'Sending a password reset code…';
   passwordResetStatus.dataset.state = 'pending';
   try {
-    const {auth, sendPasswordResetEmail} = await getFirebaseAuth();
-    await sendPasswordResetEmail(auth, passwordResetEmail.value.trim().toLowerCase());
-    passwordResetStatus.textContent = 'If an account uses that email, Firebase sent a password reset link. Follow it, then return and sign in with your new password.';
+    const result = await accountRequest('/api/auth/password-reset/send', {email:passwordResetEmail.value.trim().toLowerCase()});
+    passwordResetPanel.hidden = false;
+    [passwordResetCode, passwordResetNewPassword, passwordResetConfirmPassword].forEach(field => { field.required = true; });
+    if (result.dev_code) {
+      passwordResetCode.value = result.dev_code;
+      passwordResetStatus.textContent = `${result.message} Enter a new password below.`;
+    } else {
+      passwordResetCode.value = '';
+      passwordResetStatus.textContent = 'If an account uses that email, a six-digit reset code has been sent. Enter it with your new password below.';
+    }
     passwordResetStatus.dataset.state = 'success';
   } catch (error) {
     passwordResetStatus.textContent = error.message;
@@ -4561,7 +4593,32 @@ $('#sendPasswordResetCode').onclick = async () => {
 };
 forgotPasswordForm.onsubmit = async event => {
   event.preventDefault();
+  if (!passwordResetFormValidity()) return;
+  const button = forgotPasswordForm.querySelector('button[type="submit"]');
+  button.disabled = true;
+  passwordResetStatus.textContent = 'Updating password…';
+  passwordResetStatus.dataset.state = 'pending';
+  try {
+    await accountRequest('/api/auth/password-reset', {
+      email:passwordResetEmail.value.trim().toLowerCase(),
+      code:passwordResetCode.value.trim(),
+      newPassword:passwordResetNewPassword.value
+    });
+    passwordResetStatus.textContent = 'Password reset. Return to sign in and use your new password.';
+    passwordResetStatus.dataset.state = 'success';
+  } catch (error) {
+    passwordResetStatus.textContent = error.message;
+    passwordResetStatus.dataset.state = 'error';
+  } finally { button.disabled = false; }
 };
+function passwordResetFormValidity() {
+  if (!passwordResetPanel.hidden && passwordResetNewPassword.value !== passwordResetConfirmPassword.value) {
+    passwordResetStatus.textContent = 'The new passwords do not match.';
+    passwordResetStatus.dataset.state = 'error';
+    return false;
+  }
+  return forgotPasswordForm.reportValidity();
+}
 $('#accountMode').onclick = async () => {
   if (registration) return setRegistration(false);
   try {
@@ -4581,32 +4638,34 @@ accountForm.onsubmit = async event => {
       throw new Error('Verify your email address before creating an account.');
     }
     if (registration) {
-      if (!firebaseVerifiedToken) throw new Error('Verify your email from the Firebase message first.');
-      await accountRequest('/api/auth/firebase/register', {...formData, idToken:firebaseVerifiedToken});
+      if (formData.username.includes('@')) {
+        const emailName = formData.username.split('@')[0];
+        formData.username = emailName.toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 32);
+      }
+      if (!/^[A-Za-z0-9_]{3,32}$/.test(formData.username)) throw new Error('Choose a username with 3 to 32 letters, numbers, or underscores.');
+      await accountRequest('/api/auth/register', formData);
       setRegistration(false);
       accountForm.elements.password.value = '';
       await initializeAccount();
+      setTab('profile');
     } else {
       const identifier = String(formData.username || '').trim();
-      if (identifier.toUpperCase() === 'ADMIN') {
+      try {
         await accountRequest('/api/auth/login', formData);
-      } else {
-        const {auth, signInWithEmailAndPassword, getIdToken, reload} = await getFirebaseAuth();
-        let email = identifier;
-        if (!identifier.includes('@')) {
-          const result = await accountRequest('/api/auth/resolve-login', {username:identifier});
-          if (!result.email) throw new Error('Username or email is incorrect.');
-          email = result.email;
-        }
+      } catch (customError) {
+        if (identifier.toUpperCase() === 'ADMIN' || customError.status !== 401) throw customError;
         try {
-          const credential = await signInWithEmailAndPassword(auth, email, formData.password);
+          const result = identifier.includes('@') ? {email:identifier} : await accountRequest('/api/auth/resolve-login', {username:identifier});
+          if (!result.email) throw customError;
+          const {auth, signInWithEmailAndPassword, getIdToken, reload} = await getFirebaseAuth();
+          const credential = await signInWithEmailAndPassword(auth, result.email, formData.password);
           await reload(credential.user);
           if (!credential.user.emailVerified) throw new Error('Verify your email from the Firebase message before signing in.');
-          await accountRequest('/api/auth/firebase/session', {idToken:await getIdToken(credential.user, true)});
-        } catch (firebaseError) {
-          if (['auth/user-not-found','auth/invalid-credential','auth/operation-not-allowed'].includes(firebaseError.code)) {
-            await accountRequest('/api/auth/login', formData);
-          } else throw firebaseError;
+          await accountRequest('/api/auth/firebase/session', {idToken:await getIdToken(credential.user, true), password:formData.password});
+        } catch (legacyError) {
+          if (legacyError.status === undefined && legacyError.code && ['auth/user-not-found','auth/invalid-credential','auth/operation-not-allowed'].includes(legacyError.code)) throw customError;
+          if (legacyError.status === 401 && /No BrandWise profile/.test(legacyError.message)) throw customError;
+          throw legacyError;
         }
       }
       await initializeAccount();
@@ -4773,14 +4832,7 @@ profileChangePasswordForm.onsubmit = async event => {
   button.disabled = true;
   profilePasswordStatus.textContent = 'Updating password…';
   try {
-    const {auth, EmailAuthProvider, reauthenticateWithCredential, updatePassword} = await getFirebaseAuth();
-    if (auth.currentUser) {
-      const credential = EmailAuthProvider.credential(auth.currentUser.email, currentPassword);
-      await reauthenticateWithCredential(auth.currentUser, credential);
-      await updatePassword(auth.currentUser, newPassword);
-    } else {
-      await accountRequest('/api/auth/change-password', {currentPassword, newPassword});
-    }
+    await accountRequest('/api/auth/change-password', {currentPassword, newPassword});
     profileChangePasswordForm.reset();
     profilePasswordStatus.textContent = 'Password changed successfully.';
   } catch (error) {
@@ -4807,17 +4859,38 @@ $('#profileSendResetCode').onclick = async () => {
   if (!email.reportValidity()) return;
   const button = $('#profileSendResetCode');
   button.disabled = true;
-  profilePasswordResetStatus.textContent = 'Sending a secure reset link…';
+  profilePasswordResetStatus.textContent = 'Sending a password reset code…';
   try {
-    const {auth, sendPasswordResetEmail} = await getFirebaseAuth();
-    await sendPasswordResetEmail(auth, email.value.trim().toLowerCase());
-    profilePasswordResetStatus.textContent = 'If this email has an account, Firebase sent a password reset link. Follow it, then sign in with your new password.';
+    const result = await accountRequest('/api/auth/password-reset/send', {email:email.value.trim().toLowerCase()});
+    $('#profileResetCode').value = result.dev_code || '';
+    profilePasswordResetStatus.textContent = result.dev_code
+      ? `${result.message} Enter and confirm your new password below.`
+      : 'If this email has an account, a six-digit reset code has been sent. Enter it with your new password below.';
   } catch (error) {
     profilePasswordResetStatus.textContent = error.message;
   } finally { button.disabled = false; }
 };
 profilePasswordResetForm.onsubmit = async event => {
   event.preventDefault();
+  const newPassword = $('#profileResetNewPassword').value;
+  if (newPassword !== $('#profileResetConfirmPassword').value) {
+    profilePasswordResetStatus.textContent = 'The new passwords do not match.';
+    return;
+  }
+  const button = profilePasswordResetForm.querySelector('button[type="submit"]');
+  button.disabled = true;
+  profilePasswordResetStatus.textContent = 'Updating password…';
+  try {
+    await accountRequest('/api/auth/password-reset', {
+      email:$('#profileResetEmail').value.trim().toLowerCase(),
+      code:$('#profileResetCode').value.trim(),
+      newPassword
+    });
+    profilePasswordResetForm.reset();
+    profilePasswordResetStatus.textContent = 'Password reset. Sign out and sign in with your new password.';
+  } catch (error) {
+    profilePasswordResetStatus.textContent = error.message;
+  } finally { button.disabled = false; }
 };
 function setProfileOpen(open) {
   profilePopover.hidden = !open;

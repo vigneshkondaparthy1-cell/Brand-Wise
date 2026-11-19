@@ -13,6 +13,10 @@ The standard-library HTTP server in `server.py` serves `The-Final-Draft-Hackatho
 
 For Render, add `DATABASE_URL` using Neon's pooled connection string. Also add `DATABASE_URL_UNPOOLED` from Neon for the schema migration connection. Keep both values in Render's environment settings and out of source control. The application uses the pooled URL for normal traffic and the direct URL only while applying schema migrations.
 
+## Firebase Authentication
+
+The Firebase CLI project target is `brand-wise-7318f`, with Email/Password authentication declared in `firebase.json`. This config is not deployed automatically. After installing or running the Firebase CLI and signing in with an account that can access the project, apply it with `npx -y firebase-tools@latest deploy --only auth`. The current BrandWise sign-in page and account/session backend still use the existing account system; deploying this provider configuration alone does not migrate users or switch app sign-in to Firebase.
+
 ## Local demo sign-ins
 
 These credentials are for this local demo only. Do not reuse them on a public deployment.

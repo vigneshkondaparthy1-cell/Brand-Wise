@@ -21,6 +21,10 @@ class DatabaseUnavailable(RuntimeError):
 
 
 def uses_postgres():
+    # Explicit local development mode keeps localhost data on SQLite/JSON even
+    # when a hosted DATABASE_URL is present in the developer's .env file.
+    if os.environ.get("BRANDWISE_LOCAL_STORAGE", "").strip().lower() in ("1", "true", "yes"):
+        return False
     if os.environ.get("NO_POSTGRES"):
         return False
     return bool(os.environ.get("DATABASE_URL", "").strip())

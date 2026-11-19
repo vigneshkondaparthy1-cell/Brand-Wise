@@ -381,8 +381,8 @@ def reset_password_with_email_otp(raw_email, code, new_password):
     email = normalize_email(raw_email)
     if not isinstance(code, str) or not re.fullmatch(r'\d{6}', code.strip()):
         raise ValueError('Enter the six-digit code from your email.')
-    if not isinstance(new_password, str) or not 15 <= len(new_password) <= 128:
-        raise ValueError('Use a new password between 15 and 128 characters.')
+    if not isinstance(new_password, str) or not 4 <= len(new_password) <= 128:
+        raise ValueError('Use a new password between 4 and 128 characters.')
     now = int(time.time())
     with closing(connect()) as db:
         db.execute('BEGIN IMMEDIATE')
@@ -421,8 +421,8 @@ def register(data):
     email = normalize_email(email)
     if role not in ROLES or any(not value or len(value) > 500 for value in (name, organization, work, responsibilities)):
         raise ValueError('Complete the profile questions and select a role.')
-    if not 15 <= len(password) <= 128:
-        raise ValueError('Use a password between 15 and 128 characters.')
+    if not 4 <= len(password) <= 128:
+        raise ValueError('Use a password between 4 and 128 characters.')
     if username.casefold() == 'admin':
         raise ValueError('That username is reserved.')
     salt = secrets.token_bytes(16)
@@ -434,10 +434,16 @@ def register(data):
             db.execute('INSERT INTO accounts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
                        (username, email, name, role, organization, work, responsibilities, salt, digest(password, salt)))
             db.execute('DELETE FROM email_verifications WHERE email = ?', (email,))
+            token = secrets.token_urlsafe(32)
+            now = int(time.time())
+            db.execute('DELETE FROM sessions WHERE expires <= ?', (now,))
+            db.execute('INSERT INTO sessions (token, username, expires, active_company_id) VALUES (?, ?, ?, NULL)',
+                       (sha256(token.encode()).digest(), username, now + SESSION_AGE))
     except Exception as exc:
         if _is_integrity_error(exc):
             raise ValueError('That username or email is already registered.') from None
         raise
+    return token
 
 def firebase_user_from_token(id_token):
     """Validate a Firebase ID token through Identity Toolkit (no service key needed)."""
@@ -470,22 +476,32 @@ def firebase_register(data):
         raise ValueError('Verify your email from the Firebase email before registering.')
     clean = dict(data)
     clean['email'] = identity['email']
-    clean['password'] = secrets.token_urlsafe(48)
+    clean['password'] = data.get('password')
     username, name, role, organization, work, responsibilities = (clean[field].strip() for field in fields)
     email = clean['email']
     if not re.fullmatch(r'[A-Za-z0-9_]{3,32}', username):
         raise ValueError('Use 3 to 32 letters, numbers, or underscores for your username.')
     if role not in ROLES or any(not value or len(value) > 500 for value in (name, organization, work, responsibilities)):
         raise ValueError('Complete the profile questions and select a role.')
+    if not isinstance(clean['password'], str) or not 4 <= len(clean['password']) <= 128:
+        raise ValueError('Use a password between 4 and 128 characters.')
     if username.casefold() == 'admin':
         raise ValueError('That username is reserved.')
     salt = secrets.token_bytes(16)
     try:
         with closing(connect()) as db, db:
-            db.execute('INSERT INTO accounts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                       (username, email, name, role, organization, work, responsibilities, salt, digest(clean['password'], salt)))
+            # A retry after the profile row committed must restore a session, not strand
+            # the verified owner with an 'already registered' error. Firebase's verified
+            # token proves ownership of this email; retain the existing profile as-is.
+            existing = db.execute('SELECT username FROM accounts WHERE lower(email)=lower(?)', (email,)).fetchone()
+            if existing:
+                username = existing['username']
+            else:
+                db.execute('INSERT INTO accounts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                           (username, email, name, role, organization, work, responsibilities, salt, digest(clean['password'], salt)))
             token = secrets.token_urlsafe(32)
             now = int(time.time())
+            db.execute('DELETE FROM sessions WHERE expires <= ?', (now,))
             db.execute('INSERT INTO sessions (token, username, expires, active_company_id) VALUES (?, ?, ?, NULL)',
                        (sha256(token.encode()).digest(), username, now + SESSION_AGE))
     except Exception as exc:
@@ -494,14 +510,23 @@ def firebase_register(data):
         raise
     return token
 
-def firebase_session(id_token):
+def firebase_session(id_token, password=None):
     identity = firebase_user_from_token(id_token)
     if not identity['email_verified']:
         raise ValueError('Verify your email address before signing in.')
+    if password is not None and (not isinstance(password, str) or not 4 <= len(password) <= 128):
+        raise ValueError('Use a password between 4 and 128 characters.')
     with closing(connect()) as db, db:
         row = db.execute('SELECT username FROM accounts WHERE lower(email)=lower(?)', (identity['email'],)).fetchone()
         if not row:
             raise ValueError('No BrandWise profile is registered for this email. Create an account first.')
+        if password is not None:
+            # Older Firebase-backed profiles received a random local password.
+            # After Firebase verifies the same email and password, migrate that
+            # credential so normal BrandWise login works on the next sign-in.
+            salt = secrets.token_bytes(16)
+            db.execute('UPDATE accounts SET salt=?, password_hash=? WHERE username=?',
+                       (salt, digest(password, salt), row['username']))
         token = secrets.token_urlsafe(32)
         now = int(time.time())
         db.execute('DELETE FROM sessions WHERE expires <= ?', (now,))
@@ -743,8 +768,8 @@ def change_password(headers, current_password, new_password):
         raise ValueError('Sign in first.')
     if not isinstance(current_password, str) or not current_password or len(current_password) > 128:
         raise ValueError('Enter your current password.')
-    if not isinstance(new_password, str) or not 15 <= len(new_password) <= 128:
-        raise ValueError('Use a new password between 15 and 128 characters.')
+    if not isinstance(new_password, str) or not 4 <= len(new_password) <= 128:
+        raise ValueError('Use a new password between 4 and 128 characters.')
     token = cookie_token(headers)
     with closing(connect()) as db:
         db.execute('BEGIN IMMEDIATE')

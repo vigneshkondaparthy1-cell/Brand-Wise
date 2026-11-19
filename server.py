@@ -1369,10 +1369,11 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json(200, {'ok': True})
         if path == '/api/auth/register':
             try:
-                accounts.register(data)
+                token = accounts.register(data)
             except ValueError as exc:
                 return self.send_json(400, {'error': str(exc)})
-            return self.send_json(201, {'ok': True})
+            secure = '; Secure' if self.headers.get('X-Forwarded-Proto', '').casefold() == 'https' else ''
+            return self.send_json(201, {'ok': True}, f'brandwise_session={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={accounts.SESSION_AGE}{secure}')
         if path == '/api/auth/firebase/register':
             try:
                 token = accounts.firebase_register(data)
@@ -1385,7 +1386,7 @@ class Handler(BaseHTTPRequestHandler):
             if not accounts.is_local_dev() and accounts.login_is_limited(client_ip):
                 return self.send_json(429, {'error': 'Too many sign-in attempts. Try again later.'})
             try:
-                token = accounts.firebase_session(data.get('idToken'))
+                token = accounts.firebase_session(data.get('idToken'), data.get('password'))
             except ValueError as exc:
                 if not accounts.is_local_dev():
                     accounts.record_login_failure(client_ip)
