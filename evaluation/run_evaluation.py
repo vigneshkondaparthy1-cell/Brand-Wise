@@ -1,10 +1,13 @@
 """Report deterministic detection and false-positive rates on the labelled set."""
 import json
+import os
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+# The labelled benchmark uses checked-in fixtures; it must not depend on Neon.
+os.environ["NO_POSTGRES"] = "1"
 from server import run_brandwise_checks
 
 cases = json.loads((Path(__file__).with_name("test_set.json")).read_text(encoding="utf-8"))

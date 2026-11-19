@@ -1,6 +1,12 @@
 import unittest
 import os
 import time
+import base64
+import json
+import tempfile
+from contextlib import closing
+from pathlib import Path
+from unittest.mock import patch
 
 os.environ['NO_POSTGRES'] = '1'
 
@@ -9,6 +15,38 @@ import accounts
 
 
 class Round3ImprovementsTests(unittest.TestCase):
+
+    def test_repeated_prohibited_phrase_has_distinct_offsets(self):
+        claim = {'id':'CLM-TEST', 'statement':'Use supported wording', 'category':'Brand',
+                 'evidence':'Approved brief', 'owner':'Brand Manager', 'expiry':'2030-01-01',
+                 'status':'Active', 'prohibitedPhrases':['guaranteed']}
+        copy = 'Guaranteed results. Guaranteed support.'
+        result = server.run_brandwise_checks(copy, _claims=[claim])
+        hits = [item for item in result['findings'] if item['category'] == 'Prohibited Claim Wording']
+        self.assertEqual([item['location'] for item in hits], ['Offset 0..10', 'Offset 20..30'])
+
+    def test_firebase_verified_reset_updates_custom_password(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(accounts, 'DB', Path(directory) / 'accounts.sqlite3'):
+            email = 'reset@example.test'
+            accounts.connect().close()
+            with closing(accounts.connect()) as db, db:
+                salt = b'0123456789abcdef'
+                db.execute('INSERT INTO accounts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                           ('reset_user', email, 'Reset User', 'Creator', 'Test', 'Writer', 'Drafts',
+                            salt, accounts.digest('oldpass', salt)))
+            payload = base64.urlsafe_b64encode(json.dumps({'auth_time':int(time.time())}).encode()).decode().rstrip('=')
+            token = 'header.' + payload + '.signature'
+            with patch.object(accounts, 'firebase_user_from_token', return_value={'email':email, 'email_verified':True}):
+                accounts.reset_password_with_firebase_token(token, 'new4')
+            self.assertIsNotNone(accounts.login({'username':'reset_user', 'password':'new4'}))
+            self.assertIsNone(accounts.login({'username':'reset_user', 'password':'oldpass'}))
+
+    def test_old_firebase_session_cannot_reset_custom_password(self):
+        payload = base64.urlsafe_b64encode(json.dumps({'auth_time':int(time.time()) - 601}).encode()).decode().rstrip('=')
+        token = 'header.' + payload + '.signature'
+        with patch.object(accounts, 'firebase_user_from_token', return_value={'email':'reset@example.test', 'email_verified':True}):
+            with self.assertRaisesRegex(ValueError, 'too old'):
+                accounts.reset_password_with_firebase_token(token, 'new4')
 
     def test_improvement_1_dynamic_claim_ledger_updates(self):
         """Updating a claim in the ledger immediately updates verification results."""
