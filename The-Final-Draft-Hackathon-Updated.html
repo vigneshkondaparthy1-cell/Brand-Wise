@@ -3999,21 +3999,16 @@ async function askAuditChat(question) {
   let response;
   const status = $('#auditChatStatus');
   status.hidden = false;
-  status.textContent = 'Preparing the in-browser AI. The first use downloads model files.';
+  status.textContent = 'Asking BrandWise Guide…';
   try {
-    response = { answer: await answerWithIntegratedLlm(question.trim(), history, auditId) };
-  } catch (localError) {
-    status.textContent = 'Trying the server AI…';
-    try {
-      const result = await fetch('/api/chat', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ auditId, question: question.trim(), history })
-      });
-      response = await result.json();
-      if (!result.ok) response = { error: `${friendlyAiError(localError)} ${response.error || 'Server AI is unavailable.'}` };
-    } catch (error) {
-      response = { error: `${friendlyAiError(localError)} Server AI is unavailable. Check your connection and try again.` };
-    }
+    const result = await fetch('/api/chat', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ auditId, question: question.trim(), history })
+    });
+    response = await result.json();
+    if (!result.ok) response = { error: response.error || 'BrandWise Guide is unavailable. Please try again.' };
+  } catch (error) {
+    response = { error: 'BrandWise Guide is unavailable. Check your connection and try again.' };
   }
   status.hidden = true;
   if (auditId === (currentAuditRecord?.id || null)) {
