@@ -6,6 +6,7 @@ from http.cookies import SimpleCookie, CookieError
 from pathlib import Path
 import json
 import ipaddress
+import logging
 import os
 import re
 import secrets
@@ -273,8 +274,15 @@ def _send_otp_message(email, code, password_reset=False, client_ip=None):
             except urllib.error.HTTPError as exc:
                 if not is_local_dev(client_ip):
                     detail = ''
+                    raw_response = exc.read(4096).decode('utf-8', errors='replace')
+                    if exc.code == 403:
+                        logging.getLogger(__name__).warning(
+                            'Resend rejected email send: content_type=%s response=%s',
+                            exc.headers.get('Content-Type', ''),
+                            raw_response.replace(resend_api_key, '[redacted]')[:300],
+                        )
                     try:
-                        response_data = json.loads(exc.read(4096).decode('utf-8', errors='replace'))
+                        response_data = json.loads(raw_response)
                         detail = response_data.get('message', '') if isinstance(response_data, dict) else ''
                     except (ValueError, UnicodeDecodeError):
                         pass
