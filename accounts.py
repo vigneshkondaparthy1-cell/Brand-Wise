@@ -4,6 +4,7 @@ from hmac import compare_digest
 from http.cookies import SimpleCookie, CookieError
 from pathlib import Path
 import json
+import ipaddress
 import os
 import re
 import secrets
@@ -89,33 +90,36 @@ def connect():
 
 LOGIN_WINDOW_SECONDS = 900
 LOGIN_MAX_FAILURES = 5
+LOGIN_LOCK_SECONDS = 300
 
 def login_is_limited(client_ip):
     now = int(time.time())
     cutoff = now - LOGIN_WINDOW_SECONDS
-    try:
-        with closing(connect()) as db, db:
-            db.execute("DELETE FROM login_failures WHERE attempted_at < ?", (cutoff,))
-            row = db.execute("SELECT COUNT(*) AS total FROM login_failures WHERE ip = ? AND attempted_at >= ?", (client_ip, cutoff)).fetchone()
-            total = row['total'] if row else 0
-            return total >= LOGIN_MAX_FAILURES
-    except Exception:
+    client_ip = ipaddress.ip_address(client_ip).compressed
+    with closing(connect()) as db, db:
+        db.execute("DELETE FROM login_failures WHERE attempted_at < ?", (cutoff,))
+        row = db.execute(
+            "SELECT COUNT(*) AS total, MAX(attempted_at) AS latest FROM login_failures WHERE ip = ? AND attempted_at >= ?",
+            (client_ip, cutoff),
+        ).fetchone()
+        total = row['total'] if row else 0
+        latest = row['latest'] if row else None
+        if total >= LOGIN_MAX_FAILURES and latest and now - latest < LOGIN_LOCK_SECONDS:
+            return True
+        if total >= LOGIN_MAX_FAILURES:
+            db.execute("DELETE FROM login_failures WHERE ip = ?", (client_ip,))
         return False
 
 def record_login_failure(client_ip):
     now = int(time.time())
-    try:
-        with closing(connect()) as db, db:
-            db.execute("INSERT INTO login_failures (ip, attempted_at) VALUES (?, ?)", (client_ip, now))
-    except Exception:
-        pass
+    client_ip = ipaddress.ip_address(client_ip).compressed
+    with closing(connect()) as db, db:
+        db.execute("INSERT INTO login_failures (ip, attempted_at) VALUES (?, ?)", (client_ip, now))
 
 def clear_login_failures(client_ip):
-    try:
-        with closing(connect()) as db, db:
-            db.execute("DELETE FROM login_failures WHERE ip = ?", (client_ip,))
-    except Exception:
-        pass
+    client_ip = ipaddress.ip_address(client_ip).compressed
+    with closing(connect()) as db, db:
+        db.execute("DELETE FROM login_failures WHERE ip = ?", (client_ip,))
 
 def migrate_local_accounts():
     """Copy local account records to a new Neon database without copying sessions or OTPs."""
@@ -157,13 +161,14 @@ def normalize_email(value):
         raise ValueError('Enter a valid email address.')
     return email
 
-def is_local_dev():
-    if os.environ.get('RENDER'):
+def is_local_dev(client_ip=None):
+    """Permit lockout bypass only for explicitly configured loopback development."""
+    if os.environ.get('RENDER') or os.environ.get('BRANDWISE_ENV', '').strip().casefold() != 'development':
         return False
-    env = os.environ.get('BRANDWISE_ENV', '').strip().lower()
-    if env == 'production':
+    try:
+        return bool(client_ip) and ipaddress.ip_address(client_ip).is_loopback
+    except ValueError:
         return False
-    return True
 
 def _require_fresh_firebase_link(id_token):
     """Accept only a recently authenticated, verified Firebase email identity."""
