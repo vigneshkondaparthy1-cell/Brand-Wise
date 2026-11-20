@@ -1367,14 +1367,40 @@ class Handler(BaseHTTPRequestHandler):
                     parsed_origin.query or parsed_origin.fragment or
                     parsed_origin.netloc.casefold() != host):
                 return self.send_json(403, {'error': 'Request origin is not allowed.'})
-        if path in ('/api/auth/password-reset/send', '/api/auth/password-reset',
-                    '/api/auth/send-otp', '/api/auth/verify-otp'):
-            return self.send_json(410, {'error': 'Email codes are retired. Use the Firebase email link in BrandWise.'})
-        if path == '/api/auth/firebase/password-reset':
-            if not allow_otp_request(self.client_address[0]):
-                return self.send_json(429, {'error': 'Too many reset attempts. Wait and try again.'})
+        if path == '/api/auth/send-otp':
+            client_ip = self.client_address[0]
+            if not allow_otp_request(client_ip):
+                return self.send_json(429, {'error': 'Too many verification requests. Wait 10 minutes and try again.'})
             try:
-                accounts.reset_password_with_firebase_token(data.get('idToken'), data.get('newPassword'))
+                res = accounts.send_email_otp(data.get('email'), client_ip=client_ip)
+            except accounts.EmailDeliveryError as exc:
+                return self.send_json(503, {'error': str(exc)})
+            except ValueError as exc:
+                return self.send_json(400, {'error': str(exc)})
+            dev_code = res.get('dev_code') if isinstance(res, dict) else None
+            return self.send_json(200, {'ok': True, 'dev_code': dev_code})
+        if path == '/api/auth/verify-otp':
+            try:
+                accounts.verify_email_otp(data.get('email'), data.get('code'))
+            except ValueError as exc:
+                return self.send_json(400, {'error': str(exc)})
+            return self.send_json(200, {'ok': True})
+        if path == '/api/auth/password-reset/send':
+            client_ip = self.client_address[0]
+            if not allow_otp_request(client_ip):
+                return self.send_json(429, {'error': 'Too many verification requests. Wait 10 minutes and try again.'})
+            try:
+                res = accounts.send_password_reset_otp(data.get('email'), client_ip=client_ip)
+            except accounts.EmailDeliveryError as exc:
+                return self.send_json(503, {'error': str(exc)})
+            except ValueError as exc:
+                return self.send_json(400, {'error': str(exc)})
+            dev_code = res.get('dev_code') if isinstance(res, dict) else None
+            msg = f'Reset code: {dev_code} (Local development mode)' if dev_code else 'If an account uses that email, a reset code has been sent via Resend.'
+            return self.send_json(200, {'ok': True, 'message': msg, 'dev_code': dev_code})
+        if path == '/api/auth/password-reset':
+            try:
+                accounts.reset_password_with_email_otp(data.get('email'), data.get('code'), data.get('newPassword'))
             except ValueError as exc:
                 return self.send_json(400, {'error': str(exc)})
             return self.send_json(200, {'ok': True})
@@ -1384,25 +1410,6 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError as exc:
                 return self.send_json(400, {'error': str(exc)})
             return self.send_json(201, {'ok': True}, self._session_cookie(token))
-        if path == '/api/auth/firebase/register':
-            try:
-                token = accounts.firebase_register(data)
-            except ValueError as exc:
-                return self.send_json(400, {'error': str(exc)})
-            return self.send_json(201, {'ok': True}, self._session_cookie(token))
-        if path == '/api/auth/firebase/session':
-            client_ip = self.client_address[0]
-            local_dev = accounts.is_local_dev(client_ip)
-            if not local_dev and accounts.login_is_limited(client_ip):
-                return self.send_json(429, {'error': 'Too many sign-in attempts. Try again later.'})
-            try:
-                token = accounts.firebase_session(data.get('idToken'), data.get('password'))
-            except ValueError as exc:
-                if not local_dev:
-                    accounts.record_login_failure(client_ip)
-                return self.send_json(401, {'error': str(exc)})
-            accounts.clear_login_failures(client_ip)
-            return self.send_json(200, {'ok': True}, self._session_cookie(token))
         if path == '/api/auth/resolve-login':
             email = accounts.email_for_login(data.get('username'))
             return self.send_json(200, {'email': email})
@@ -1450,12 +1457,6 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(200, accounts.update_profile(self.headers, data))
             except ValueError as exc:
                 return self.send_json(400, {'error': str(exc)})
-        if path == '/api/auth/firebase/verify-profile-email':
-            try:
-                email = accounts.verify_profile_email_with_firebase_token(self.headers, data.get('idToken'))
-            except ValueError as exc:
-                return self.send_json(400, {'error': str(exc)})
-            return self.send_json(200, {'ok': True, 'email': email})
         if path == '/api/auth/change-password':
             try:
                 accounts.change_password(self.headers, data.get('currentPassword'), data.get('newPassword'))
