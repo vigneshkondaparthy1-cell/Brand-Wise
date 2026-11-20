@@ -1510,6 +1510,23 @@ html[data-signed-in] #authSignInStage, html[data-signed-in] #authOverview,
   #authPageHeader .auth-theme-control span { display: none; }
   #authPageHeader #authTheme { min-width: 0; padding-inline: 6px; }
 }
+.audit-chat-launcher{position:fixed;right:22px;bottom:22px;z-index:1001;display:grid;place-items:center;width:62px;height:62px;border:2px solid white;border-radius:50%;background:var(--blue);color:white;box-shadow:0 8px 26px rgba(17,33,70,.28);cursor:pointer;transition:transform .18s ease,box-shadow .18s ease}
+.audit-chat-launcher:hover{transform:translateY(-3px);box-shadow:0 12px 30px rgba(17,33,70,.34)}
+.audit-chat-launcher:focus-visible,.audit-chat-close:focus-visible{outline:3px solid var(--orange);outline-offset:3px}
+.audit-chat-launcher[hidden],.audit-chat[hidden]{display:none}
+.audit-chat{position:fixed;right:22px;bottom:96px;z-index:1002;display:flex;flex-direction:column;width:min(390px,calc(100vw - 28px));max-height:min(560px,calc(100dvh - 116px));border:1px solid var(--line);border-radius:16px;padding:16px;background:var(--card);box-shadow:0 18px 50px rgba(17,33,70,.24)}
+.audit-chat-heading{display:flex;justify-content:space-between;align-items:start;gap:12px;margin-bottom:12px;color:var(--navy)}
+.audit-chat-heading div{display:grid;gap:3px}
+.audit-chat-heading span{font-size:11px;color:var(--text-muted)}
+.audit-chat-close{border:0;background:transparent;color:var(--text-muted);font-size:26px;line-height:1;cursor:pointer}
+.audit-chat-prompts{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.audit-chat-prompts button{border:1px solid var(--line);border-radius:20px;background:var(--card-elevated);padding:6px 9px;color:var(--blue-text,var(--blue));cursor:pointer;font-size:11px}
+.audit-chat-messages{display:grid;align-content:start;gap:8px;min-height:0;flex:1;overflow:auto;margin-bottom:10px}
+.audit-chat-message{max-width:90%;padding:9px 11px;border-radius:10px;white-space:pre-wrap;font-size:12px;line-height:1.5;background:var(--card-elevated);border:1px solid var(--line)}
+.audit-chat-message.user{justify-self:end;background:var(--blue-light)}
+.audit-chat-form{display:flex;gap:8px;flex-shrink:0}
+.audit-chat-form input{flex:1;min-width:0;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--card-elevated);color:var(--navy)}
+@media(max-width:480px){.audit-chat-launcher{right:14px;bottom:14px}.audit-chat{right:14px;bottom:90px;max-height:calc(100dvh - 108px)}}
 </style>
 </head>
 <body>
@@ -3134,6 +3151,29 @@ html[data-signed-in] #authSignInStage, html[data-signed-in] #authOverview,
 <!-- Toast -->
 <div id="toast">Operation Completed</div>
 
+<button type="button" class="audit-chat-launcher" id="auditChatLauncher" aria-label="Open BrandWise Guide" aria-controls="auditChat" aria-expanded="false" hidden>
+  <svg viewBox="0 0 64 64" width="38" height="38" aria-hidden="true" fill="none">
+    <path d="M32 8v7M28 7h8" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+    <rect x="10" y="17" width="44" height="38" rx="13" fill="white" stroke="currentColor" stroke-width="3"/>
+    <path d="M10 30H6v11h4m44-11h4v11h-4" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/>
+    <circle cx="23" cy="34" r="4" fill="currentColor"/><circle cx="41" cy="34" r="4" fill="currentColor"/>
+    <path d="M24 45c4 4 12 4 16 0" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+  </svg>
+</button>
+          <section class="audit-chat" id="auditChat" role="dialog" aria-label="BrandWise Guide" hidden>
+            <div class="audit-chat-heading"><div><strong>BrandWise Guide</strong><span>Answers use this saved report</span></div><button type="button" class="audit-chat-close" id="auditChatClose" aria-label="Close BrandWise Guide">&times;</button></div>
+            <div class="audit-chat-prompts" id="auditChatPrompts">
+              <button type="button" data-question="What should I fix first?">What should I fix first?</button>
+              <button type="button" data-question="Why were these issues flagged?">Why were these issues flagged?</button>
+              <button type="button" data-question="How do I improve this draft?">How do I improve this draft?</button>
+              <button type="button" data-question="Where do I approve this audit?">Where do I approve this audit?</button>
+            </div>
+            <div class="audit-chat-messages" id="auditChatMessages" role="log" aria-live="polite"></div>
+            <form id="auditChatForm" class="audit-chat-form">
+              <input id="auditChatQuestion" maxlength="1000" aria-label="Question about this audit" placeholder="Ask about a finding or what to do next" required>
+              <button type="submit" class="btn-pill-primary" id="auditChatSend">Ask</button>
+            </form>
+          </section>
 <script>
 (()=>{
 'use strict';
@@ -3923,7 +3963,75 @@ $('#btnAuditContent').onclick = async () => {
   }
 };
 
+let auditChatHistory = [];
+let auditChatId = null;
+
+function addAuditChatMessage(role, content) {
+  const message = document.createElement('div');
+  message.className = `audit-chat-message ${role}`;
+  message.textContent = content;
+  $('#auditChatMessages').append(message);
+  message.scrollIntoView({ block: 'nearest' });
+}
+
+function resetAuditChat(auditId) {
+  auditChatId = auditId || null;
+  auditChatHistory = [];
+  $('#auditChatMessages').replaceChildren();
+  $('#auditChat').querySelector('.audit-chat-heading span').textContent = 'Answers use this saved report';
+  $('#auditChat').hidden = true;
+  $('#auditChatLauncher').hidden = !auditId;
+  $('#auditChatLauncher').setAttribute('aria-expanded', 'false');
+}
+
+async function askAuditChat(question) {
+  const auditId = currentAuditRecord?.id;
+  if (!auditId || !question.trim() || $('#auditChatSend').disabled) return;
+  const history = auditChatHistory.slice(-6);
+  addAuditChatMessage('user', question.trim());
+  $('#auditChatQuestion').value = '';
+  $('#auditChatSend').disabled = true;
+  const response = await api(`/api/audits/${encodeURIComponent(auditId)}/chat`, {
+    method: 'POST', body: JSON.stringify({ question: question.trim(), history })
+  });
+  if (auditId === currentAuditRecord?.id) {
+    const answer = response?.answer || 'BrandWise Guide AI is unavailable right now. Please try again later.';
+    if (response?.answer) $('#auditChat').querySelector('.audit-chat-heading span').textContent = response.aiPowered ? 'AI answers based on this saved report' : 'Summary from this saved report';
+    addAuditChatMessage('assistant', answer);
+    if (response?.answer) {
+      auditChatHistory.push({ role: 'user', content: question.trim() }, { role: 'assistant', content: answer });
+      auditChatHistory = auditChatHistory.slice(-6);
+    }
+  }
+  $('#auditChatSend').disabled = false;
+}
+
+$('#auditChatLauncher').addEventListener('click', () => {
+  const panel = $('#auditChat');
+  panel.hidden = !panel.hidden;
+  $('#auditChatLauncher').setAttribute('aria-expanded', String(!panel.hidden));
+  if (!panel.hidden) $('#auditChatQuestion').focus();
+});
+$('#auditChatClose').addEventListener('click', () => {
+  $('#auditChat').hidden = true;
+  $('#auditChatLauncher').setAttribute('aria-expanded', 'false');
+  $('#auditChatLauncher').focus();
+});
+$('#auditChat').addEventListener('keydown', event => {
+  if (event.key === 'Escape') $('#auditChatClose').click();
+});
+
+$('#auditChatForm').addEventListener('submit', event => {
+  event.preventDefault();
+  askAuditChat($('#auditChatQuestion').value);
+});
+$('#auditChatPrompts').addEventListener('click', event => {
+  const question = event.target.closest('button')?.dataset.question;
+  if (question) askAuditChat(question);
+});
+
 function renderAuditReport(res) {
+  if (auditChatId !== res.id) resetAuditChat(res.id);
   $('#btnExportPDF').disabled = !res || !Array.isArray(res.findings) || !Number.isFinite(Number(res.score));
   if (Number.isFinite(Number(res.clientRoundTripMs))) {
     $('#analysisTimingLabel').textContent = `Audit API round-trip: ${Math.round(Number(res.clientRoundTripMs))} ms (browser ↔ server)`;
@@ -4150,6 +4258,7 @@ function startNewAudit() {
   $('#auditTitleInput').value = '';
   $('#draftImportStatus').textContent = 'Paste or import a draft to begin. Imported text is shown here before checks.';
   currentAuditRecord = null;
+  resetAuditChat(null);
   $('#btnExportPDF').disabled = true;
   rememberUnsavedDraft(true);
   $('#reportConfidenceVal').textContent = '—';

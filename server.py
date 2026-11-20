@@ -16,6 +16,7 @@ import uuid
 import database
 from document_ingestion import extract_document
 from gemini_review import review as gemini_review
+from audit_chat import answer as answer_audit_question
 import review_validation
 
 ROOT = Path(__file__).resolve().parent
@@ -1674,6 +1675,28 @@ class Handler(BaseHTTPRequestHandler):
             if not save_json(DB, audits):
                 return self.send_json(503, {'error': 'The audit could not be saved. Your draft is still available in the editor; retry the check.'})
             return self.send_json(201, new_record)
+
+        if path.startswith('/api/audits/') and path.endswith('/chat'):
+            audit_id = path[len('/api/audits/'):-len('/chat')].strip('/')
+            audit = next((item for item in audits_visible_to_user(get_audits(), user) if item.get('id') == audit_id), None)
+            if not audit:
+                return self.send_json(404, {'error': 'Audit not found.'})
+            question = data.get('question')
+            history = data.get('history', [])
+            if not isinstance(question, str) or not question.strip() or len(question) > 1000:
+                return self.send_json(400, {'error': 'Enter a question under 1,000 characters.'})
+            if not isinstance(history, list) or len(history) > 6 or any(
+                not isinstance(item, dict) or item.get('role') not in ('user', 'assistant') or
+                not isinstance(item.get('content'), str) or len(item['content']) > 2000 for item in history
+            ):
+                return self.send_json(400, {'error': 'Invalid chat history.'})
+            if not (os.environ.get('GEMINI_API_KEY', '').strip() or os.environ.get('OPENAI_API_KEY', '').strip()):
+                return self.send_json(503, {'error': 'BrandWise Guide AI is not configured on this server.'})
+            try:
+                reply = answer_audit_question(audit, question.strip(), history)
+                return self.send_json(200, {'answer': reply, 'aiPowered': bool(os.environ.get('GEMINI_API_KEY', '').strip() or os.environ.get('OPENAI_API_KEY', '').strip())})
+            except Exception:
+                return self.send_json(503, {'error': 'Audit help is temporarily unavailable. Please try again.'})
 
         # 2. Audit Actions: Accept, Edit, Dismiss, Report Incorrect Flag, Change State, Add Comment
         if path.startswith('/api/audits/') and path.endswith('/action'):
