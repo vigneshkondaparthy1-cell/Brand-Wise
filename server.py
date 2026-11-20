@@ -1095,6 +1095,17 @@ def storage_errors_as_503(handler):
 
 
 class Handler(BaseHTTPRequestHandler):
+    @staticmethod
+    def _secure_session_cookie():
+        # Never trust X-Forwarded-Proto from the request itself: clients can
+        # supply it. Render terminates TLS upstream; local dev remains HTTP.
+        return bool(os.environ.get('RENDER')) or os.environ.get('BRANDWISE_ENV', '').strip().casefold() == 'production'
+
+    def _session_cookie(self, token, max_age=None):
+        secure = '; Secure' if self._secure_session_cookie() else ''
+        age = accounts.SESSION_AGE if max_age is None else max_age
+        return f'brandwise_session={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={age}{secure}'
+
     def send_error(self, code, message=None, explain=None):
         if urllib.parse.urlparse(self.path).path.startswith('/api/'):
             return self.send_json(code, {'error': message or 'API request could not be completed.'})
@@ -1343,11 +1354,19 @@ class Handler(BaseHTTPRequestHandler):
 
         if not isinstance(data, dict):
             return self.send_json(400, {'error': 'Expected a JSON object'})
-        if self.headers.get('Sec-Fetch-Site') == 'cross-site':
-            return self.send_json(403, {'error': 'Open BrandWise to submit this request.'})
-        origin = self.headers.get('Origin')
-        if origin and urllib.parse.urlparse(origin).netloc.casefold() != self.headers.get('Host', '').casefold():
-            return self.send_json(403, {'error': 'Request origin is not allowed.'})
+        if path.startswith('/api/'):
+            fetch_site = (self.headers.get('Sec-Fetch-Site') or '').casefold()
+            if fetch_site == 'cross-site':
+                return self.send_json(403, {'error': 'Open BrandWise to submit this request.'})
+            origin = self.headers.get('Origin')
+            host = (self.headers.get('Host') or '').casefold()
+            parsed_origin = urllib.parse.urlparse(origin or '')
+            if (not origin or parsed_origin.scheme not in ('http', 'https') or
+                    not parsed_origin.netloc or parsed_origin.username or parsed_origin.password or
+                    parsed_origin.path not in ('', '/') or parsed_origin.params or
+                    parsed_origin.query or parsed_origin.fragment or
+                    parsed_origin.netloc.casefold() != host):
+                return self.send_json(403, {'error': 'Request origin is not allowed.'})
         if path in ('/api/auth/password-reset/send', '/api/auth/password-reset',
                     '/api/auth/send-otp', '/api/auth/verify-otp'):
             return self.send_json(410, {'error': 'Email codes are retired. Use the Firebase email link in BrandWise.'})
@@ -1364,43 +1383,41 @@ class Handler(BaseHTTPRequestHandler):
                 token = accounts.register(data)
             except ValueError as exc:
                 return self.send_json(400, {'error': str(exc)})
-            secure = '; Secure' if self.headers.get('X-Forwarded-Proto', '').casefold() == 'https' else ''
-            return self.send_json(201, {'ok': True}, f'brandwise_session={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={accounts.SESSION_AGE}{secure}')
+            return self.send_json(201, {'ok': True}, self._session_cookie(token))
         if path == '/api/auth/firebase/register':
             try:
                 token = accounts.firebase_register(data)
             except ValueError as exc:
                 return self.send_json(400, {'error': str(exc)})
-            secure = '; Secure' if self.headers.get('X-Forwarded-Proto', '').casefold() == 'https' else ''
-            return self.send_json(201, {'ok': True}, f'brandwise_session={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={accounts.SESSION_AGE}{secure}')
+            return self.send_json(201, {'ok': True}, self._session_cookie(token))
         if path == '/api/auth/firebase/session':
             client_ip = self.client_address[0]
-            if not accounts.is_local_dev() and accounts.login_is_limited(client_ip):
+            local_dev = accounts.is_local_dev(client_ip)
+            if not local_dev and accounts.login_is_limited(client_ip):
                 return self.send_json(429, {'error': 'Too many sign-in attempts. Try again later.'})
             try:
                 token = accounts.firebase_session(data.get('idToken'), data.get('password'))
             except ValueError as exc:
-                if not accounts.is_local_dev():
+                if not local_dev:
                     accounts.record_login_failure(client_ip)
                 return self.send_json(401, {'error': str(exc)})
             accounts.clear_login_failures(client_ip)
-            secure = '; Secure' if self.headers.get('X-Forwarded-Proto', '').casefold() == 'https' else ''
-            return self.send_json(200, {'ok': True}, f'brandwise_session={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={accounts.SESSION_AGE}{secure}')
+            return self.send_json(200, {'ok': True}, self._session_cookie(token))
         if path == '/api/auth/resolve-login':
             email = accounts.email_for_login(data.get('username'))
             return self.send_json(200, {'email': email})
         if path == '/api/auth/login':
             client_ip = self.client_address[0]
-            if not accounts.is_local_dev() and accounts.login_is_limited(client_ip):
+            local_dev = accounts.is_local_dev(client_ip)
+            if not local_dev and accounts.login_is_limited(client_ip):
                 return self.send_json(429, {'error': 'Too many sign-in attempts. Try again later.'})
             token = accounts.login(data)
             if not token:
-                if not accounts.is_local_dev():
+                if not local_dev:
                     accounts.record_login_failure(client_ip)
                 return self.send_json(401, {'error': 'Username, email, or password is incorrect. You can try again immediately.'})
             accounts.clear_login_failures(client_ip)
-            secure = '; Secure' if self.headers.get('X-Forwarded-Proto', '').casefold() == 'https' else ''
-            return self.send_json(200, {'ok': True}, f'brandwise_session={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={accounts.SESSION_AGE}{secure}')
+            return self.send_json(200, {'ok': True}, self._session_cookie(token))
         user = accounts.current_user(self.headers)
         if not user:
             return self.send_json(401, {'error': 'Sign in first.'})
@@ -1450,7 +1467,7 @@ class Handler(BaseHTTPRequestHandler):
                 accounts.delete_account(self.headers, data.get('password'))
             except ValueError as exc:
                 return self.send_json(400, {'error': str(exc)})
-            return self.send_json(200, {'ok': True}, 'brandwise_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0')
+            return self.send_json(200, {'ok': True}, self._session_cookie('', max_age=0))
         if path == '/api/audit-preferences':
             membership = accounts.active_membership(self.headers)
             if not membership:
@@ -1461,7 +1478,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(400, {'error': str(exc)})
         if path == '/api/auth/logout':
             accounts.logout(self.headers)
-            return self.send_json(200, {'ok': True}, 'brandwise_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0')
+            return self.send_json(200, {'ok': True}, self._session_cookie('', max_age=0))
         if path in ('/api/keys', '/api/keys/test', '/api/reset') and user['role'] != 'Admin':
             return self.send_json(403, {'error': 'Administrator access required.'})
         membership = accounts.active_membership(self.headers)
@@ -1669,7 +1686,8 @@ class Handler(BaseHTTPRequestHandler):
             action_type = data.get('action') # 'accept_fix', 'edit_fix', 'dismiss_fix', 'change_state', 'add_comment', 'report_incorrect_flag'
             now_iso = datetime.now(timezone.utc).isoformat()
             user_name = user['name']
-            effective_role = (accounts.active_membership(self.headers) or {}).get('role') or user['role']
+            membership = accounts.active_membership(self.headers)
+            effective_role = membership.get('role', '') if membership else ''
             current_revision = target_audit.get('currentRevisionId')
             if data.get('baseRevisionId') != current_revision:
                 return self.send_json(409, {'error': 'This audit changed since you opened it. Reload the saved revision before applying this action.', 'currentRevisionId': current_revision})
