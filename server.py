@@ -195,6 +195,13 @@ def _require_auth(fn):
 from auth_routes import register_auth_routes
 register_auth_routes(app, limiter)
 
+# Route the signed-in workspace API through the existing persistent backend.
+# Specific account routes above continue to take precedence over this route.
+from wsgi_backend import dispatch as dispatch_workspace_api
+app.add_url_rule('/api/<path:path>', endpoint='workspace_api',
+                 view_func=dispatch_workspace_api,
+                 methods=['GET', 'POST', 'HEAD', 'OPTIONS'])
+
 # ---------------------------------------------------------------------------
 # Health endpoint
 # ---------------------------------------------------------------------------
