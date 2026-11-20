@@ -171,9 +171,22 @@ def hash_password(password: str) -> str:
 def verify_password(hash_: str, password: str) -> bool:
     """Verify a password against an Argon2id hash. Returns False on any error."""
     try:
+        if isinstance(hash_, (bytes, bytearray, memoryview)):
+            hash_ = bytes(hash_).decode('utf-8')
         return ph.verify(hash_, password)
     except Exception:
         return False
+
+def password_matches(password, salt, stored_hash):
+    """Accept current Argon2 hashes and legacy PBKDF2 account records."""
+    stored = bytes(stored_hash) if isinstance(stored_hash, (bytes, bytearray, memoryview)) else stored_hash
+    if isinstance(stored, bytes) and stored.startswith(b'$argon2'):
+        return verify_password(stored, password)
+    if isinstance(stored, str) and stored.startswith('$argon2'):
+        return verify_password(stored, password)
+    return isinstance(stored, bytes) and compare_digest(
+        pbkdf2_hmac('sha256', password.encode(), bytes(salt), 600000), stored
+    )
 
 # Backwards‑compatible wrapper (old name still used elsewhere)
 def digest(password, salt):
@@ -507,9 +520,11 @@ def login(data):
             'SELECT * FROM accounts WHERE lower(username) = lower(?) OR lower(email) = lower(?)',
             (identifier, identifier),
         ).fetchone()
-        hashed = digest(password, row['salt'] if row else bytes(16))
-        if not row or not compare_digest(hashed, row['password_hash']):
+        if not row or not password_matches(password, row['salt'], row['password_hash']):
             return None
+        if not bytes(row['password_hash']).startswith(b'$argon2'):
+            db.execute('UPDATE accounts SET password_hash=? WHERE username=?',
+                       (digest(password, row['salt']), row['username']))
         token = secrets.token_urlsafe(32)
         now = int(time.time())
         db.execute('DELETE FROM sessions WHERE expires <= ?', (now,))
@@ -729,7 +744,7 @@ def change_password(headers, current_password, new_password):
     with closing(connect()) as db:
         db.execute('BEGIN IMMEDIATE')
         row = db.execute('SELECT salt, password_hash FROM accounts WHERE username=?', (user['username'],)).fetchone()
-        if not row or not compare_digest(digest(current_password, row['salt']), row['password_hash']):
+        if not row or not password_matches(current_password, row['salt'], row['password_hash']):
             db.rollback()
             raise ValueError('The current password is incorrect.')
         salt = secrets.token_bytes(16)
@@ -748,7 +763,7 @@ def delete_account(headers, password):
     with closing(connect()) as db:
         db.execute('BEGIN IMMEDIATE')
         row = db.execute('SELECT salt, password_hash, email FROM accounts WHERE username=?', (user['username'],)).fetchone()
-        if not row or not compare_digest(digest(password, row['salt']), row['password_hash']):
+        if not row or not password_matches(password, row['salt'], row['password_hash']):
             db.rollback()
             raise ValueError('The current password is incorrect.')
         # Profile details live on the account row. Delete that row and all
@@ -770,3 +785,4 @@ def cleanup_expired_sessions():
     with closing(connect()) as db, db:
         cursor = db.execute('DELETE FROM sessions WHERE expires <= ?', (int(time.time()),))
         return cursor.rowcount
+
