@@ -466,9 +466,9 @@ def run_brandwise_checks(text: str, channel: str = "Website Copy", _claims=None)
     claims = _claims if _claims is not None else get_current_ai_reference_claims()
     # Helper to add a finding
     def add_finding(cat, src_id, location, title, **extra):
-            # Add a default 'why' explanation for findings that cannot be verified automatically
-            if src_id in ('CLM-004', 'CLM-005') and 'why' not in extra:
-                extra['why'] = 'Requires legal review and further evidence.'
+        # Add a default 'why' explanation for findings that cannot be verified automatically
+        if src_id in ('CLM-004', 'CLM-005') and 'why' not in extra:
+            extra['why'] = 'Requires legal review and further evidence.'
         f = {
             "category": cat,
             "sourceId": src_id,
