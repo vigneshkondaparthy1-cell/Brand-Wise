@@ -5,7 +5,7 @@ BrandWise is a local content review demo. It checks marketing copy against the c
 ## Run locally
 
 1. Use Python 3.10 or newer.
-2. Copy `.env.example` to `.env` for optional local settings. Registration, profile email verification, and password reset use Firebase email links in the browser. The old Resend and SMTP code endpoints are retired. In Firebase Console, enable **Authentication → Sign-in method → Email/Password → Email link (passwordless sign-in)** and authorize the app domains, including `brand-wise.onrender.com` and `localhost` for local testing. Add `GEMINI_API_KEY` only for optional Gemini review. Rule checks work without an AI key. Set `DATABASE_URL` to use Neon PostgreSQL; optionally set `DATABASE_URL_UNPOOLED` for schema migrations.
+2. Copy `.env.example` to `.env` for optional local settings. Registration, profile email verification, and password reset use 6-digit OTP codes sent via Resend (`RESEND_API_KEY` and `RESEND_FROM`). In local development mode, codes are automatically output in the terminal if Resend is not configured. Add `GEMINI_API_KEY` only for optional Gemini review. Rule checks work without an AI key. Set `DATABASE_URL` to use Neon PostgreSQL; optionally set `DATABASE_URL_UNPOOLED` for schema migrations.
 3. Install dependencies with `python -m pip install -r requirements.txt`.
 4. Run `python server.py` and open `http://127.0.0.1:8765`.
 
@@ -13,9 +13,13 @@ The standard-library HTTP server in `server.py` serves `The-Final-Draft-Hackatho
 
 For Render, add `DATABASE_URL` using Neon's pooled connection string. Also add `DATABASE_URL_UNPOOLED` from Neon for the schema migration connection. Keep both values in Render's environment settings and out of source control. The application uses the pooled URL for normal traffic and the direct URL only while applying schema migrations.
 
-## Firebase Authentication
+## Email Authentication (Resend)
 
-The Firebase project is `brand-wise-7318f`. Firebase sends and verifies email links for new accounts, email changes, and password resets. BrandWise keeps its own password hashes and sessions so four-character passwords remain supported. A Firebase link only establishes ownership of the email; the server validates the resulting Firebase ID token before registering or resetting a BrandWise password. Firebase's Email link provider and authorized domains must be enabled in the Console; changing `firebase.json` alone does not enable delivery. Resetting a password invalidates existing BrandWise sessions.
+Registration, email changes, and password resets are verified via 6-digit one-time passcode (OTP) emails delivered through [Resend](https://resend.com).
+- Configure `RESEND_API_KEY` with your API key from Resend.
+- Configure `RESEND_FROM` with your verified sender address (e.g. `BrandWise <noreply@getbrandwise.xyz>`).
+- If running in local development mode without Resend keys, the server logs generated verification codes to the console so registration and password reset can still be tested offline.
+- BrandWise securely hashes and stores passwords using PBKDF2-HMAC-SHA256 with individual cryptographic salts. Resetting a password invalidates all existing active sessions.
 
 ## Local demo sign-ins
 
@@ -30,7 +34,7 @@ These credentials are for this local demo only. Do not reuse them on a public de
 | Brand Manager | `test_brandmanager` | `TestUser2026!` |
 
 Admin accounts are provisioned locally and cannot be created through registration.
-New accounts must open the Firebase verification link before registration. New passwords must be at least 4 characters.
+New accounts must verify their email with a 6-digit code sent via Resend before registration. New passwords must be at least 4 characters.
 
 ## AI and privacy
 

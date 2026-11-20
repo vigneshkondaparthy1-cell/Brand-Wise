@@ -25,7 +25,7 @@ class Round3ImprovementsTests(unittest.TestCase):
         hits = [item for item in result['findings'] if item['category'] == 'Prohibited Claim Wording']
         self.assertEqual([item['location'] for item in hits], ['Offset 0..10', 'Offset 20..30'])
 
-    def test_firebase_verified_reset_updates_custom_password(self):
+    def test_resend_otp_verified_reset_updates_custom_password(self):
         with tempfile.TemporaryDirectory() as directory, patch.object(accounts, 'DB', Path(directory) / 'accounts.sqlite3'):
             email = 'reset@example.test'
             accounts.connect().close()
@@ -34,19 +34,28 @@ class Round3ImprovementsTests(unittest.TestCase):
                 db.execute('INSERT INTO accounts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
                            ('reset_user', email, 'Reset User', 'Creator', 'Test', 'Writer', 'Drafts',
                             salt, accounts.digest('oldpass', salt)))
-            payload = base64.urlsafe_b64encode(json.dumps({'auth_time':int(time.time())}).encode()).decode().rstrip('=')
-            token = 'header.' + payload + '.signature'
-            with patch.object(accounts, 'firebase_user_from_token', return_value={'email':email, 'email_verified':True}):
-                accounts.reset_password_with_firebase_token(token, 'new4')
+            with patch.object(accounts, '_send_otp_message', side_effect=lambda email, code, **kw: code):
+                res = accounts.send_password_reset_otp(email)
+                self.assertTrue(res['ok'])
+                accounts.reset_password_with_email_otp(email, res['dev_code'], 'new4')
             self.assertIsNotNone(accounts.login({'username':'reset_user', 'password':'new4'}))
             self.assertIsNone(accounts.login({'username':'reset_user', 'password':'oldpass'}))
 
-    def test_old_firebase_session_cannot_reset_custom_password(self):
-        payload = base64.urlsafe_b64encode(json.dumps({'auth_time':int(time.time()) - 601}).encode()).decode().rstrip('=')
-        token = 'header.' + payload + '.signature'
-        with patch.object(accounts, 'firebase_user_from_token', return_value={'email':'reset@example.test', 'email_verified':True}):
-            with self.assertRaisesRegex(ValueError, 'too old'):
-                accounts.reset_password_with_firebase_token(token, 'new4')
+    def test_invalid_otp_cannot_reset_custom_password(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(accounts, 'DB', Path(directory) / 'accounts.sqlite3'):
+            email = 'reset@example.test'
+            accounts.connect().close()
+            with closing(accounts.connect()) as db, db:
+                salt = b'0123456789abcdef'
+                db.execute('INSERT INTO accounts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                           ('reset_user', email, 'Reset User', 'Creator', 'Test', 'Writer', 'Drafts',
+                            salt, accounts.digest('oldpass', salt)))
+            with patch.object(accounts, '_send_otp_message', side_effect=lambda email, code, **kw: code):
+                res = accounts.send_password_reset_otp(email)
+                code = res['dev_code']
+                wrong_code = '000000' if code != '000000' else '111111'
+            with self.assertRaises(ValueError):
+                accounts.reset_password_with_email_otp(email, wrong_code, 'new4')
 
     def test_improvement_1_dynamic_claim_ledger_updates(self):
         """Updating a claim in the ledger immediately updates verification results."""
