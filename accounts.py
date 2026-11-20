@@ -280,7 +280,9 @@ def _send_otp_message(email, code, password_reset=False, client_ip=None):
                         pass
                     message = f'Resend could not send the {purpose} code (HTTP {exc.code}).'
                     if exc.code == 403:
-                        if 'resend.dev' in resend_sender.casefold():
+                        if detail:
+                            detail = f'Resend says: {detail}'
+                        elif 'resend.dev' in resend_sender.casefold():
                             detail = 'The Resend test sender can only deliver to the email address that owns the Resend account. For verification emails to other users, verify your sending domain (like getbrandwise.xyz) in Resend and set RESEND_FROM to that domain.'
                         else:
                             detail = f'Resend denied sender "{resend_sender}". Make sure the domain is verified in your Resend account and RESEND_API_KEY has sending permission.'
