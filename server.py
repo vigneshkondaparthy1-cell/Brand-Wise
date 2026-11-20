@@ -586,4 +586,9 @@ def audits_visible_to_user(audits: list, user: dict) -> list:
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "8000"))
+    if os.name != "nt":
+        # Use a production WSGI server for direct Linux launches too. This
+        # covers Render's manual `python server.py` command when it bypasses
+        # the Procfile, while keeping the Windows local demo simple.
+        os.execlp("gunicorn", "gunicorn", "--bind", f"0.0.0.0:{port}", "server:app")
     app.run(host="0.0.0.0", port=port, debug=False)
