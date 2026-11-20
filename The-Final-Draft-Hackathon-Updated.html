@@ -4946,7 +4946,6 @@ passwordToggle.onclick = () => {
 let registration = false;
 let roleQuestions = {};
 let verifiedEmail = '';
-let verifiedEmail = '';
 const registrationEmail = $('#registrationEmail');
 const emailOtpPanel = $('#emailOtpPanel');
 const emailOtpCode = $('#emailOtpCode');
@@ -5275,7 +5274,6 @@ $('#confirmProfileEmailOtp').onclick = async () => {
     $('#profileEmailStatus').textContent = error.message;
     $('#profileEmailStatus').dataset.state = 'error';
   }
-};
 };
 $('#profileEditForm').onsubmit = async event => {
   event.preventDefault();
