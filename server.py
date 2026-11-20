@@ -18,6 +18,8 @@ import os
 import uuid
 import time
 import hashlib
+import base64
+import re
 from pathlib import Path
 from typing import Optional, Dict, Any
 
@@ -35,6 +37,15 @@ import sqlite3
 # ---------------------------------------------------------------------------
 load_dotenv()  # Load .env if present
 APP_ROOT = Path(__file__).parent
+def _csp_script_hashes():
+    """Allow only the inline scripts shipped with this exact homepage."""
+    page = (APP_ROOT / "index.html").read_text(encoding="utf-8")
+    scripts = re.findall(r"<script[^>]*>(.*?)</script>", page, re.I | re.S)
+    return " ".join(
+        "'sha256-" + base64.b64encode(hashlib.sha256(script.replace("\r\n", "\n").encode("utf-8")).digest()).decode("ascii") + "'"
+        for script in scripts if script.strip()
+    )
+
 DB_PATH = APP_ROOT / "accounts.sqlite3"
 
 # Secrets – must be present in environment or .env
@@ -60,7 +71,7 @@ Talisman(
     app,
     content_security_policy={
         "default-src": "'self'",
-        "script-src": "'self'",
+        "script-src": "'self' " + _csp_script_hashes(),
         "style-src": "'self' 'unsafe-inline'",
         "img-src": "'self' data:",
     },

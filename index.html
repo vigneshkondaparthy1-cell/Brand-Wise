@@ -1662,7 +1662,7 @@ html[data-signed-in] #authSignInStage, html[data-signed-in] #authOverview,
     <span class="auth-cloud"></span>
   </div>
   <h1 id="accountTitle">Sign in</h1>
-  <form id="accountForm">
+  <form id="accountForm" method="post" action="/api/auth/login">
     <label>Username or email <input name="username" required maxlength="254" autocomplete="username"></label>
     <label>Password
       <span class="password-field">
@@ -1692,7 +1692,7 @@ html[data-signed-in] #authSignInStage, html[data-signed-in] #authOverview,
     <button id="forgotPasswordButton" type="button">Forgot password?</button>
     <p id="accountError" role="status"></p>
   </form>
-  <form id="forgotPasswordForm" hidden>
+  <form id="forgotPasswordForm" method="post" action="/api/auth/password-reset" hidden>
     <p style="margin:0 0 4px;">Enter your account email and we’ll send a password reset code via Resend.</p>
     <label for="passwordResetEmail">Email</label>
     <div class="email-entry-row">
