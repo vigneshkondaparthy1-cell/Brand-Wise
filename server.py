@@ -16,7 +16,7 @@ import uuid
 import database
 from document_ingestion import extract_document
 from gemini_review import review as gemini_review
-from audit_chat import answer as answer_audit_question
+from audit_chat import answer as answer_audit_question, prepare_chat
 import review_validation
 
 ROOT = Path(__file__).resolve().parent
@@ -1449,10 +1449,14 @@ class Handler(BaseHTTPRequestHandler):
                 if len(recent) >= 20:
                     return self.send_json(429, {'error': 'Too many questions. Please try again in a few minutes.'})
                 CHAT_REQUESTS[requester] = recent + [now]
+            workspace = {'claims': claims_for_user(user), 'guidelines': guidelines_for_user(user)} if user else None
+            if data.get('contextOnly') is True:
+                instruction, context = prepare_chat(audit, question.strip(), history, workspace)
+                return self.send_json(200, {'instruction': instruction, 'context': context})
             if not (os.environ.get('GEMINI_API_KEY', '').strip() or os.environ.get('OPENAI_API_KEY', '').strip()):
                 return self.send_json(503, {'error': 'BrandWise Guide AI is not configured on this server.'})
             try:
-                reply = answer_audit_question(audit, question.strip(), history)
+                reply = answer_audit_question(audit, question.strip(), history, workspace)
                 return self.send_json(200, {'answer': reply})
             except urllib.error.HTTPError as exc:
                 message = 'The AI provider rejected its API key. Configure a valid server key.' if exc.code in (401, 403) else 'The AI provider is unavailable. Please try again.'

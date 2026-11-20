@@ -34,7 +34,7 @@ New accounts must open the Firebase verification link before registration. New p
 
 ## AI and privacy
 
-Deterministic rules run in the app server. When a user enables Gemini review, the draft and approved claims and guidelines used for context are sent to Google Gemini. When a user asks BrandWise Guide a question, the saved audit and recent chat messages are sent to the configured Gemini or OpenAI provider. Account and audit data are stored in Neon when `DATABASE_URL` is configured; otherwise the local SQLite/JSON fallback is used. The OpenAI adapter exists in the codebase but is not currently called by the audit workflow; drafts are not sent to OpenAI. No OCR or pgvector service is part of this running demo.
+Deterministic rules run in the app server. When a user enables Gemini review, the draft and approved claims and guidelines used for context are sent to Google Gemini. BrandWise Guide uses an integrated in-browser model for questions about the product and saved audits. The browser downloads and caches the model on first use. If that model cannot run, a configured Gemini or OpenAI server key can answer instead; that fallback sends the question, recent chat, relevant product guidance, any open audit, and for signed-in users the active workspace guidelines and claims to the provider. Account and audit data are stored in Neon when `DATABASE_URL` is configured; otherwise the local SQLite/JSON fallback is used. The OpenAI adapter exists in the codebase but is not currently called by the audit workflow; drafts are not sent to OpenAI. No OCR or pgvector service is part of this running demo.
 
 ## Limits and security
 

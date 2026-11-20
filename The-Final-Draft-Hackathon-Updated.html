@@ -1525,6 +1525,7 @@ html[data-signed-in] #authSignInStage, html[data-signed-in] #authOverview,
 .audit-chat-messages{display:grid;align-content:start;gap:8px;min-height:0;flex:1;overflow:auto;margin-bottom:10px}
 .audit-chat-message{max-width:90%;padding:9px 11px;border-radius:10px;white-space:pre-wrap;font-size:12px;line-height:1.5;background:var(--card-elevated);border:1px solid var(--line)}
 .audit-chat-message.user{justify-self:end;background:var(--blue-light)}
+.audit-chat-status{font-size:11px;color:var(--text-muted);margin:0 0 8px}
 .audit-chat-form{display:flex;gap:8px;flex-shrink:0}
 .audit-chat-form input{flex:1;min-width:0;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--card-elevated);color:var(--navy)}
 @media(max-width:480px){.audit-chat-launcher{right:14px;bottom:14px}.audit-chat{right:14px;bottom:90px;max-height:calc(100dvh - 108px)}}
@@ -3170,6 +3171,7 @@ html[data-signed-in] #authSignInStage, html[data-signed-in] #authOverview,
               <button type="button" data-question="Where do I approve this audit?">Where do I approve this audit?</button>
             </div>
             <div class="audit-chat-messages" id="auditChatMessages" role="log" aria-live="polite"></div>
+            <p class="audit-chat-status" id="auditChatStatus" role="status" aria-live="polite" hidden></p>
             <form id="auditChatForm" class="audit-chat-form">
               <input id="auditChatQuestion" maxlength="1000" aria-label="Ask BrandWise Guide a question" placeholder="Ask BrandWise Guide anything" required>
               <button type="submit" class="btn-pill-primary" id="auditChatSend">Ask</button>
@@ -3979,6 +3981,7 @@ function resetAuditChat(auditId) {
   auditChatId = auditId || null;
   auditChatHistory = [];
   $('#auditChatMessages').replaceChildren();
+  $('#auditChatStatus').hidden = true;
   $('#auditChat').querySelector('.audit-chat-heading span').textContent = auditId ? 'Ask about this audit or anything else' : 'Ask me anything';
   $('#auditChat').hidden = true;
   $('#auditChatPrompts').hidden = !auditId;
@@ -3994,16 +3997,25 @@ async function askAuditChat(question) {
   $('#auditChatQuestion').value = '';
   $('#auditChatSend').disabled = true;
   let response;
+  const status = $('#auditChatStatus');
+  status.hidden = false;
+  status.textContent = 'Preparing the in-browser AI. The first use downloads model files.';
   try {
-    const result = await fetch('/api/chat', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ auditId, question: question.trim(), history })
-    });
-    response = await result.json();
-    if (!result.ok) response = { error: response.error || 'Audit help is unavailable.' };
-  } catch (error) {
-    response = { error: 'Audit help is unavailable. Check your connection and try again.' };
+    response = { answer: await answerWithIntegratedLlm(question.trim(), history, auditId) };
+  } catch (localError) {
+    status.textContent = 'Trying the server AI…';
+    try {
+      const result = await fetch('/api/chat', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ auditId, question: question.trim(), history })
+      });
+      response = await result.json();
+      if (!result.ok) response = { error: `${friendlyAiError(localError)} ${response.error || 'Server AI is unavailable.'}` };
+    } catch (error) {
+      response = { error: `${friendlyAiError(localError)} Server AI is unavailable. Check your connection and try again.` };
+    }
   }
+  status.hidden = true;
   if (auditId === (currentAuditRecord?.id || null)) {
     const answer = response?.answer || response?.error || 'BrandWise Guide AI is unavailable right now.';
     if (response?.answer) $('#auditChat').querySelector('.audit-chat-heading span').textContent = auditId ? 'AI answers with this audit for context' : 'Ask me anything';
@@ -5760,6 +5772,7 @@ let browserAiModel = '';
 let aiLoadGeneration = 0;
 let aiLoadCancelled = false;
 let browserAiLoadPromise = null;
+let guideModelLastProgress = Date.now();
 
 function updateAiStatus(message, state = '') {
   const status = document.querySelector('#aiReviewStatus');
@@ -5833,8 +5846,11 @@ async function loadWebLlmModule() {
 
 function showAiProgress(report) {
   const progress = Math.max(0, Math.min(1, Number(report?.progress) || 0));
+  if (progress > aiModelProgress.value / 100) guideModelLastProgress = Date.now();
   aiModelProgress.value = Math.round(progress * 100);
   aiModelProgressText.textContent = report?.text || 'Preparing the in-browser model…';
+  const guideStatus = document.querySelector('#auditChatStatus');
+  if (guideStatus && !guideStatus.hidden) guideStatus.textContent = aiModelProgressText.textContent;
 }
 
 async function createBrowserEngine(webllm, modelId, generation) {
@@ -5910,11 +5926,51 @@ async function ensureBrowserModel(requestedModel) {
 }
 
 function getOrLoadBrowserModel(model) {
-  if (browserAiEngine && browserAiModel && browserAiModel.startsWith(model.includes('3B') ? 'Llama-3.2-3B' : 'Llama-3.2-1B')) return Promise.resolve(browserAiModel);
+  if (browserAiEngine && browserAiModel && (browserAiModel === model || browserAiModel === model.replace('q4f16_1', 'q4f32_1'))) return Promise.resolve(browserAiModel);
   if (!browserAiLoadPromise) {
     browserAiLoadPromise = ensureBrowserModel(model).finally(() => { browserAiLoadPromise = null; });
   }
   return browserAiLoadPromise;
+}
+
+async function answerWithIntegratedLlm(question, history, auditId) {
+  const result = await fetch('/api/chat', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ auditId, question, history, contextOnly: true })
+  });
+  const prepared = await result.json();
+  if (!result.ok) throw new Error(prepared.error || 'Could not load BrandWise knowledge.');
+  const context = JSON.parse(prepared.context);
+  if (context.audit) {
+    context.audit.content = String(context.audit.content || '').slice(0, 2500);
+    context.audit.findings = (context.audit.findings || []).slice(0, 10);
+    context.audit.claimsAtAudit = (context.audit.claimsAtAudit || []).slice(0, 10);
+  }
+  if (context.workspace?.claims) context.workspace.claims = context.workspace.claims.slice(0, 10);
+  const userMessage = JSON.stringify({ question, history, projectGuide: context.projectGuide,
+    audit: context.audit, workspace: context.audit ? null : context.workspace }).slice(0, 12000);
+  guideModelLastProgress = Date.now();
+  await new Promise((resolve, reject) => {
+    const monitor = setInterval(() => {
+      if (Date.now() - guideModelLastProgress > 120000) {
+        clearInterval(monitor);
+        reject(new Error('The in-browser AI download stopped making progress.'));
+      }
+    }, 5000);
+    getOrLoadBrowserModel(AI_MODELS.llama1b).then(
+      value => { clearInterval(monitor); resolve(value); },
+      error => { clearInterval(monitor); reject(error); }
+    );
+  });
+  if (!browserAiEngine) throw new Error('The in-browser AI did not start.');
+  const completion = await browserAiEngine.chat.completions.create({
+    messages: [{role: 'system', content: prepared.instruction}, {role: 'user', content: userMessage}],
+    temperature: 0.2,
+    max_tokens: 180
+  });
+  const answer = String(completion.choices?.[0]?.message?.content || '').trim();
+  if (!answer) throw new Error('The in-browser AI returned an empty answer.');
+  return answer;
 }
 
 function parseAiFindings(output) {

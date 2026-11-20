@@ -23,7 +23,24 @@ class AuditChatTests(unittest.TestCase):
                 result = audit_chat.answer(None, 'How do I write a clear headline?', [])
         self.assertIn('clear message', result)
         payload = json.loads(send.call_args.args[0].data)
-        self.assertIsNone(json.loads(payload['contents'][0]['parts'][0]['text'])['audit'])
+        context = json.loads(payload['contents'][0]['parts'][0]['text'])
+        self.assertIsNone(context['audit'])
+        self.assertIn('BrandWise overview', context['projectGuide'])
+
+    def test_project_and_workspace_context_reaches_model(self):
+        response = type('Response', (), {
+            '__enter__': lambda self: self,
+            '__exit__': lambda self, *args: None,
+            'read': lambda self: json.dumps({'candidates': [{'content': {'parts': [{'text': 'Open Calendar and choose Add reminder.'}]}}]}).encode(),
+        })()
+        workspace = {'guidelines': {'tone': {'primary': 'Clear'}}, 'claims': [{'id': 'C1', 'statement': 'Approved claim'}]}
+        with patch.dict(os.environ, {'GEMINI_API_KEY': 'test-key', 'OPENAI_API_KEY': ''}):
+            with patch('audit_chat.urllib.request.urlopen', return_value=response) as send:
+                audit_chat.answer(None, 'Where can I set a reminder?', [], workspace)
+        payload = json.loads(send.call_args.args[0].data)
+        context = json.loads(payload['contents'][0]['parts'][0]['text'])
+        self.assertIn('Calendar and reminders', context['projectGuide'])
+        self.assertEqual(context['workspace']['claims'][0]['id'], 'C1')
 
     def test_gemini_receives_saved_audit_and_follow_up_context(self):
         audit = {'title': 'Home page', 'content': 'Guaranteed results', 'findings': [
