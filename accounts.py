@@ -264,6 +264,8 @@ def _send_otp_message(email, code, password_reset=False, client_ip=None):
                 headers={
                     'Authorization': f'Bearer {resend_api_key}',
                     'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'User-Agent': 'BrandWise/1.0 (+https://getbrandwise.xyz)',
                 },
                 method='POST',
             )
@@ -288,7 +290,9 @@ def _send_otp_message(email, code, password_reset=False, client_ip=None):
                         pass
                     message = f'Resend could not send the {purpose} code (HTTP {exc.code}).'
                     if exc.code == 403:
-                        if detail:
+                        if raw_response.strip().casefold() == 'error code: 1010':
+                            detail = 'The email provider blocked the app connection before processing the request (Cloudflare 1010).'
+                        elif detail:
                             detail = f'Resend says: {detail}'
                         elif 'resend.dev' in resend_sender.casefold():
                             detail = 'The Resend test sender can only deliver to the email address that owns the Resend account. For verification emails to other users, verify your sending domain (like getbrandwise.xyz) in Resend and set RESEND_FROM to that domain.'
