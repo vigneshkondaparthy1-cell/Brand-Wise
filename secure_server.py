@@ -29,6 +29,7 @@ from flask import (
     jsonify,
     make_response,
     abort,
+    send_file,
 )
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -320,6 +321,11 @@ def password_reset():
 # ---------------------------------------------------------------------------
 # Health and diagnostics – keep minimal footprint
 # ---------------------------------------------------------------------------
+@app.route("/")
+def index():
+    """Serve the BrandWise web app at the deployment's primary URL."""
+    return send_file(APP_ROOT / "index.html")
+
 @app.route("/healthz")
 def health():
     return "OK", 200
