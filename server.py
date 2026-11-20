@@ -31,6 +31,8 @@ PAGE_CACHE = {}
 PAGE_CACHE_LOCK = threading.Lock()
 OTP_REQUESTS = {}
 OTP_REQUESTS_LOCK = threading.Lock()
+CHAT_REQUESTS = {}
+CHAT_REQUESTS_LOCK = threading.Lock()
 OTP_REQUEST_WINDOW_SECONDS = 600
 OTP_REQUEST_MAXIMUM = 5
 AUDIT_PREFERENCES_LOCK = threading.Lock()
@@ -1419,6 +1421,45 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(401, {'error': 'Username, email, or password is incorrect. You can try again immediately.'})
             accounts.clear_login_failures(client_ip)
             return self.send_json(200, {'ok': True}, self._session_cookie(token))
+        if path == '/api/chat':
+            user = accounts.current_user(self.headers)
+            audit_id = data.get('auditId')
+            audit = None
+            if audit_id is not None:
+                if not user:
+                    return self.send_json(401, {'error': 'Sign in to ask about a saved audit.'})
+                if not isinstance(audit_id, str) or not audit_id:
+                    return self.send_json(400, {'error': 'Invalid audit ID.'})
+                audit = next((item for item in audits_visible_to_user(get_audits(), user) if item.get('id') == audit_id), None)
+                if not audit:
+                    return self.send_json(404, {'error': 'Audit not found.'})
+            question = data.get('question')
+            history = data.get('history', [])
+            if not isinstance(question, str) or not question.strip() or len(question) > 1000:
+                return self.send_json(400, {'error': 'Enter a question under 1,000 characters.'})
+            if not isinstance(history, list) or len(history) > 6 or any(
+                not isinstance(item, dict) or item.get('role') not in ('user', 'assistant') or
+                not isinstance(item.get('content'), str) or len(item['content']) > 2000 for item in history
+            ):
+                return self.send_json(400, {'error': 'Invalid chat history.'})
+            now = time.monotonic()
+            requester = user.get('username') if user else self.client_address[0]
+            with CHAT_REQUESTS_LOCK:
+                recent = [stamp for stamp in CHAT_REQUESTS.get(requester, []) if now - stamp < 600]
+                if len(recent) >= 20:
+                    return self.send_json(429, {'error': 'Too many questions. Please try again in a few minutes.'})
+                CHAT_REQUESTS[requester] = recent + [now]
+            if not (os.environ.get('GEMINI_API_KEY', '').strip() or os.environ.get('OPENAI_API_KEY', '').strip()):
+                return self.send_json(503, {'error': 'BrandWise Guide AI is not configured on this server.'})
+            try:
+                reply = answer_audit_question(audit, question.strip(), history)
+                return self.send_json(200, {'answer': reply})
+            except urllib.error.HTTPError as exc:
+                message = 'The AI provider rejected its API key. Configure a valid server key.' if exc.code in (401, 403) else 'The AI provider is unavailable. Please try again.'
+                return self.send_json(503, {'error': message})
+            except Exception:
+                return self.send_json(503, {'error': 'BrandWise Guide AI is temporarily unavailable. Please try again.'})
+
         user = accounts.current_user(self.headers)
         if not user:
             return self.send_json(401, {'error': 'Sign in first.'})
@@ -1675,28 +1716,6 @@ class Handler(BaseHTTPRequestHandler):
             if not save_json(DB, audits):
                 return self.send_json(503, {'error': 'The audit could not be saved. Your draft is still available in the editor; retry the check.'})
             return self.send_json(201, new_record)
-
-        if path.startswith('/api/audits/') and path.endswith('/chat'):
-            audit_id = path[len('/api/audits/'):-len('/chat')].strip('/')
-            audit = next((item for item in audits_visible_to_user(get_audits(), user) if item.get('id') == audit_id), None)
-            if not audit:
-                return self.send_json(404, {'error': 'Audit not found.'})
-            question = data.get('question')
-            history = data.get('history', [])
-            if not isinstance(question, str) or not question.strip() or len(question) > 1000:
-                return self.send_json(400, {'error': 'Enter a question under 1,000 characters.'})
-            if not isinstance(history, list) or len(history) > 6 or any(
-                not isinstance(item, dict) or item.get('role') not in ('user', 'assistant') or
-                not isinstance(item.get('content'), str) or len(item['content']) > 2000 for item in history
-            ):
-                return self.send_json(400, {'error': 'Invalid chat history.'})
-            if not (os.environ.get('GEMINI_API_KEY', '').strip() or os.environ.get('OPENAI_API_KEY', '').strip()):
-                return self.send_json(503, {'error': 'BrandWise Guide AI is not configured on this server.'})
-            try:
-                reply = answer_audit_question(audit, question.strip(), history)
-                return self.send_json(200, {'answer': reply, 'aiPowered': bool(os.environ.get('GEMINI_API_KEY', '').strip() or os.environ.get('OPENAI_API_KEY', '').strip())})
-            except Exception:
-                return self.send_json(503, {'error': 'Audit help is temporarily unavailable. Please try again.'})
 
         # 2. Audit Actions: Accept, Edit, Dismiss, Report Incorrect Flag, Change State, Add Comment
         if path.startswith('/api/audits/') and path.endswith('/action'):

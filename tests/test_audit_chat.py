@@ -12,6 +12,19 @@ class AuditChatTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'Configure GEMINI_API_KEY'):
                 audit_chat.answer({'findings': []}, 'What should I change?', [])
 
+    def test_general_question_works_without_an_audit(self):
+        response = type('Response', (), {
+            '__enter__': lambda self: self,
+            '__exit__': lambda self, *args: None,
+            'read': lambda self: json.dumps({'candidates': [{'content': {'parts': [{'text': 'A clear message helps readers understand your offer.'}]}}]}).encode(),
+        })()
+        with patch.dict(os.environ, {'GEMINI_API_KEY': 'test-key', 'OPENAI_API_KEY': ''}):
+            with patch('audit_chat.urllib.request.urlopen', return_value=response) as send:
+                result = audit_chat.answer(None, 'How do I write a clear headline?', [])
+        self.assertIn('clear message', result)
+        payload = json.loads(send.call_args.args[0].data)
+        self.assertIsNone(json.loads(payload['contents'][0]['parts'][0]['text'])['audit'])
+
     def test_gemini_receives_saved_audit_and_follow_up_context(self):
         audit = {'title': 'Home page', 'content': 'Guaranteed results', 'findings': [
             {'id': 'F1', 'title': 'Unsupported promise', 'severity': 'High', 'why': 'No evidence supplied'}]}
