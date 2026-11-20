@@ -1678,7 +1678,14 @@ html[data-signed-in] #authSignInStage, html[data-signed-in] #authOverview,
         <label for="registrationEmail">Email</label>
         <div class="email-entry-row">
           <input id="registrationEmail" name="email" data-registration-field type="email" maxlength="254" autocomplete="email">
-          <button class="btn-pill-ghost" id="sendEmailOtp" type="button">Send verification link</button>
+          <button class="btn-pill-ghost" id="sendEmailOtp" type="button">Send code</button>
+        </div>
+        <div class="email-otp-panel" id="emailOtpPanel" hidden>
+          <label for="emailOtpCode">6-digit email code</label>
+          <div class="email-entry-row">
+            <input id="emailOtpCode" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="Enter code" disabled>
+            <button class="btn-pill-primary" id="confirmEmailOtp" type="button" disabled>Confirm code</button>
+          </div>
         </div>
         <p class="email-verification-status" id="emailVerificationStatus" role="status" aria-live="polite"></p>
       </div>
@@ -1687,7 +1694,7 @@ html[data-signed-in] #authSignInStage, html[data-signed-in] #authOverview,
       <label><span id="workQuestion">Job title</span> <input name="work" data-registration-field maxlength="120"></label>
       <label><span id="responsibilityQuestion">What do you do?</span> <input name="responsibilities" data-registration-field maxlength="500"></label>
     </div>
-    <button class="btn-pill-primary" id="accountSubmit" type="submit">Sign in</button>
+    <button class="btn-pill-primary" id="accountSubmit" type="submit" disabled>Sign in</button>
     <button class="btn-pill-ghost" id="accountMode" type="button">Create an account</button>
     <button id="forgotPasswordButton" type="button">Forgot password?</button>
     <p id="accountError" role="status"></p>
@@ -5204,6 +5211,7 @@ accountForm.onsubmit = async event => {
     accountError.textContent = error.message;
   } finally { button.disabled = false; }
 };
+$('#accountSubmit').disabled = false;
 const profileMenu = $('#profileMenu');
 const profileButton = $('#topAvatar');
 const profilePopover = $('#profilePopover');
