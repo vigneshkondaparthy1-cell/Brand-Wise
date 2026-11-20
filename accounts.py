@@ -160,8 +160,25 @@ def _is_integrity_error(exc):
         psycopg and isinstance(exc, psycopg.IntegrityError)
     )
 
+from argon2 import PasswordHasher
+
+ph = PasswordHasher(time_cost=2, memory_cost=102400, parallelism=8, hash_len=32, salt_len=16)
+
+def hash_password(password: str) -> str:
+    """Hash a password using Argon2id."""
+    return ph.hash(password)
+
+def verify_password(hash_: str, password: str) -> bool:
+    """Verify a password against an Argon2id hash. Returns False on any error."""
+    try:
+        return ph.verify(hash_, password)
+    except Exception:
+        return False
+
+# Backwards‑compatible wrapper (old name still used elsewhere)
 def digest(password, salt):
-    return pbkdf2_hmac('sha256', password.encode(), salt, 600000)
+    # Salt is unused by Argon2 (it generates its own). Keep signature for callers.
+    return hash_password(password).encode('utf-8')
 
 def normalize_email(value):
     if not isinstance(value, str):
