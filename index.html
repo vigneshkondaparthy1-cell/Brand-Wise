@@ -75,7 +75,7 @@ h1, h2, h3, h4, .brand-font {
   font-family: 'Barlow Condensed', Impact, sans-serif;
   font-weight: 900;
   text-transform: uppercase;
-  letter-spacing: -0.025em;
+  letter-spacing: 0.015em;
   color: var(--navy);
 }
 h1 { font-size: 52px; line-height: 0.94; }
@@ -230,6 +230,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--blue); box-shado
 .sidebar.collapsed .nav-link.active { color: #fff; background: var(--blue); box-shadow: 0 5px 14px var(--blue-glow); }
 .sidebar.collapsed .nav-link svg { width: 20px; height: 20px; }
 :root[data-theme="dark"] .sidebar.collapsed .nav-link:not(.active) { color: var(--blue-text); }
+.sidebar-nav .nav-link[hidden] { display: none; }
 
 .sidebar-bottom-score {
   background: var(--card-bg);
@@ -448,6 +449,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--blue); box-shado
   gap: 6px;
 }
 .btn-pill-ghost:hover { background: var(--card-subtle); border-color: var(--line-strong); }
+.history-dropdown { cursor: pointer; font-family: inherit; }
 
 /* Common Panels */
 .white-panel {
@@ -711,18 +713,32 @@ input:focus, select:focus, textarea:focus { border-color: var(--blue); box-shado
   background: linear-gradient(135deg, #102644, #19385f);
   color: #fff;
   border-radius: var(--radius-lg);
-  padding: 20px 24px;
+  padding: 24px 28px;
   position: relative;
   overflow: hidden;
 }
+.banner-playful small {
+  display: block;
+  color: #ffad75;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
 .banner-playful h4 {
   color: #fff;
-  font-size: 20px;
-  margin-bottom: 4px;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: clamp(20px, 2vw, 24px);
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1.2;
+  margin: 8px 0;
 }
 .banner-playful p {
-  color: #b0c5e2;
-  font-size: 11.5px;
+  color: #d5e5f8;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 /* ========================================================================= */
@@ -1016,13 +1032,13 @@ table.styled-table tr:hover td { background: var(--card-elevated); }
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #080a0f;
-  --shell: #0b0e14;
-  --card-bg: #11151d;
-  --card-elevated: #0d1016;
-  --card-subtle: #191e28;
-  --line: #252c38;
-  --line-strong: #394353;
+  --bg: #121923;
+  --shell: #172130;
+  --card-bg: #1b2635;
+  --card-elevated: #202d3e;
+  --card-subtle: #26364a;
+  --line: #334359;
+  --line-strong: #4a607a;
   --navy: #f0f5fd;
   --text: #e0e9f5;
   --text-muted: #acbed4;
@@ -1039,6 +1055,9 @@ table.styled-table tr:hover td { background: var(--card-elevated); }
   --amber: #f8c767;
   --shadow-subtle: 0 4px 18px #0003;
   --shadow-card: 0 8px 30px #0004;
+}
+:root[data-theme="dark"] body {
+  background: radial-gradient(ellipse at 50% -24%, #26364a 0%, transparent 56%), var(--bg);
 }
 :root[data-theme="dark"] .pill-blue,
 :root[data-theme="dark"] .btn-pill-ghost { color: #83c7ff; }
@@ -1340,10 +1359,10 @@ html[data-theme="dark"] .delete-account-confirmation { background:color-mix(in s
 #accountGate .password-toggle { position: absolute; top: 50%; right: 4px; transform: translateY(-50%); width: 40px; height: 36px; margin: 0; display: grid; place-items: center; padding: 0; border: 0; border-radius: 8px; color: #64748b; background: transparent; cursor: pointer; }
 .password-toggle:hover { color: #1677c8; background: #eff6ff; }
 .password-toggle svg { width: 19px; height: 19px; }
-:root[data-theme="dark"] #accountGate { color: #e0e9f5; background: #11151d; border-color: #394353; }
+:root[data-theme="dark"] #accountGate { color: #e0e9f5; background: #1b2635; border-color: #4a607a; }
 :root[data-theme="dark"] #accountGate .auth-brand-name { color: #83c7ff; }
 :root[data-theme="dark"] #accountGate .auth-theme-control { color: #acbed4; }
-:root[data-theme="dark"] #accountGate input, :root[data-theme="dark"] #accountGate select { color: #e0e9f5; background: #0d1016; border-color: #394353; }
+:root[data-theme="dark"] #accountGate input, :root[data-theme="dark"] #accountGate select { color: #e0e9f5; background: #141e2b; border-color: #4a607a; }
 :root[data-theme="dark"] #accountGate .password-toggle { color: #acbed4; }
 :root[data-theme="dark"]:not([data-signed-in]) body {
   background: radial-gradient(ellipse at 12% 0%, #493d2d 0%, transparent 42%), radial-gradient(ellipse at 88% 0%, #403244 0%, transparent 40%), #101722;
@@ -1511,6 +1530,28 @@ html[data-signed-in] #authSignInStage, html[data-signed-in] #authOverview,
   #authPageHeader #authTheme { min-width: 0; padding-inline: 6px; }
 }
 </style>
+<style>
+#aiModelProgressPanel[aria-busy="true"] #aiModelProgressText::before,
+.giant-audit-btn.is-loading::before {
+  content: '';
+  display: inline-block;
+  width: 15px;
+  height: 15px;
+  margin-right: 8px;
+  vertical-align: -3px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: brandwise-loading-spin .8s linear infinite;
+}
+#aiModelProgressPanel[aria-busy="true"] #aiModelProgressText::before { color: var(--blue); }
+#aiModelProgress::-webkit-progress-value { transition: width .25s ease; }
+@keyframes brandwise-loading-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  #aiModelProgressPanel[aria-busy="true"] #aiModelProgressText::before,
+  .giant-audit-btn.is-loading::before { animation: none; border-right-color: currentColor; }
+}
+</style>
 </head>
 <body>
 <header id="authPageHeader">
@@ -1662,7 +1703,7 @@ html[data-signed-in] #authSignInStage, html[data-signed-in] #authOverview,
     <span class="auth-cloud"></span>
   </div>
   <h1 id="accountTitle">Sign in</h1>
-  <form id="accountForm">
+  <form id="accountForm" method="post" action="/api/auth/login">
     <label>Username or email <input name="username" required maxlength="254" autocomplete="username"></label>
     <label>Password
       <span class="password-field">
@@ -1678,7 +1719,14 @@ html[data-signed-in] #authSignInStage, html[data-signed-in] #authOverview,
         <label for="registrationEmail">Email</label>
         <div class="email-entry-row">
           <input id="registrationEmail" name="email" data-registration-field type="email" maxlength="254" autocomplete="email">
-          <button class="btn-pill-ghost" id="sendEmailOtp" type="button">Send verification link</button>
+          <button class="btn-pill-ghost" id="sendEmailOtp" type="button">Send code</button>
+        </div>
+        <div class="email-otp-panel" id="emailOtpPanel" hidden>
+          <label for="emailOtpCode">6-digit email code</label>
+          <div class="email-entry-row">
+            <input id="emailOtpCode" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="Enter code" disabled>
+            <button class="btn-pill-primary" id="confirmEmailOtp" type="button" disabled>Confirm code</button>
+          </div>
         </div>
         <p class="email-verification-status" id="emailVerificationStatus" role="status" aria-live="polite"></p>
       </div>
@@ -1687,12 +1735,12 @@ html[data-signed-in] #authSignInStage, html[data-signed-in] #authOverview,
       <label><span id="workQuestion">Job title</span> <input name="work" data-registration-field maxlength="120"></label>
       <label><span id="responsibilityQuestion">What do you do?</span> <input name="responsibilities" data-registration-field maxlength="500"></label>
     </div>
-    <button class="btn-pill-primary" id="accountSubmit" type="submit">Sign in</button>
+    <button class="btn-pill-primary" id="accountSubmit" type="submit" disabled>Sign in</button>
     <button class="btn-pill-ghost" id="accountMode" type="button">Create an account</button>
     <button id="forgotPasswordButton" type="button">Forgot password?</button>
     <p id="accountError" role="status"></p>
   </form>
-  <form id="forgotPasswordForm" hidden>
+  <form id="forgotPasswordForm" method="post" action="/api/auth/password-reset" hidden>
     <p style="margin:0 0 4px;">Enter your account email and we’ll send a password reset code via Resend.</p>
     <label for="passwordResetEmail">Email</label>
     <div class="email-entry-row">
@@ -1703,9 +1751,9 @@ html[data-signed-in] #authSignInStage, html[data-signed-in] #authOverview,
       <label for="passwordResetCode">Verification code</label>
       <input id="passwordResetCode" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="6-digit code">
       <label for="passwordResetNewPassword">New password</label>
-      <input id="passwordResetNewPassword" type="password" autocomplete="new-password" minlength="4" maxlength="128" placeholder="At least 4 characters">
+      <input id="passwordResetNewPassword" type="password" autocomplete="new-password" minlength="12" maxlength="128" placeholder="At least 12 characters">
       <label for="passwordResetConfirmPassword">Confirm new password</label>
-      <input id="passwordResetConfirmPassword" type="password" autocomplete="new-password" minlength="4" maxlength="128" placeholder="Repeat new password">
+      <input id="passwordResetConfirmPassword" type="password" autocomplete="new-password" minlength="12" maxlength="128" placeholder="Repeat new password">
       <button class="btn-pill-primary" style="margin-top:14px;width:100%;" type="submit">Reset password</button>
     </div>
     <div class="reset-password-actions"><button class="btn-pill-ghost" id="backToSignIn" type="button">Back to sign in</button></div>
@@ -1861,9 +1909,9 @@ html[data-signed-in] #authSignInStage, html[data-signed-in] #authOverview,
             <label for="profileCurrentPassword">Current password</label>
             <input id="profileCurrentPassword" type="password" autocomplete="current-password" minlength="1" maxlength="128" required>
             <label for="profileNewPassword">New password</label>
-            <input id="profileNewPassword" type="password" autocomplete="new-password" minlength="4" maxlength="128" required>
+            <input id="profileNewPassword" type="password" autocomplete="new-password" minlength="12" maxlength="128" required>
             <label for="profileConfirmPassword">Confirm new password</label>
-            <input id="profileConfirmPassword" type="password" autocomplete="new-password" minlength="4" maxlength="128" required>
+            <input id="profileConfirmPassword" type="password" autocomplete="new-password" minlength="12" maxlength="128" required>
             <div class="profile-password-actions"><button class="btn-pill-primary" id="saveNewPassword" type="submit">Change password</button><button class="btn-pill-ghost" id="profileForgotPassword" type="button">Forgot password?</button></div>
             <p class="profile-password-status" id="profilePasswordStatus" role="status" aria-live="polite"></p>
           </form>
@@ -1873,8 +1921,8 @@ html[data-signed-in] #authSignInStage, html[data-signed-in] #authOverview,
             <div class="email-entry-row"><input id="profileResetEmail" type="email" autocomplete="email" required maxlength="254"><button class="btn-pill-ghost" id="profileSendResetCode" type="button">Send code</button></div>
             <div id="profileResetFields" hidden>
               <label for="profileResetCode">6-digit email code</label><input id="profileResetCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="Enter 6-digit code">
-              <label for="profileResetNewPassword">New password</label><input id="profileResetNewPassword" type="password" autocomplete="new-password" minlength="4" maxlength="128" placeholder="At least 4 characters">
-              <label for="profileResetConfirmPassword">Confirm new password</label><input id="profileResetConfirmPassword" type="password" autocomplete="new-password" minlength="4" maxlength="128">
+              <label for="profileResetNewPassword">New password</label><input id="profileResetNewPassword" type="password" autocomplete="new-password" minlength="12" maxlength="128" placeholder="At least 12 characters">
+              <label for="profileResetConfirmPassword">Confirm new password</label><input id="profileResetConfirmPassword" type="password" autocomplete="new-password" minlength="12" maxlength="128">
               <button class="btn-pill-primary" type="submit" style="margin-top:10px;width:100%;">Reset password</button>
             </div>
             <div class="profile-password-actions"><button class="btn-pill-ghost" type="button" id="cancelProfilePasswordReset">Back to change password</button></div>
@@ -2275,7 +2323,7 @@ html[data-signed-in] #authSignInStage, html[data-signed-in] #authOverview,
 
         <!-- Playful Banner -->
         <div class="banner-playful">
-          <small style="font-size:9px;font-weight:800;letter-spacing:0.1em;color:var(--orange);text-transform:uppercase;">PLAYFUL FACT</small>
+          <small>PLAYFUL FACT</small>
           <h4>NO BORING POLICIES.</h4>
           <p>Creative freedom lives inside crystal clear boundaries.</p>
         </div>
@@ -2304,8 +2352,16 @@ html[data-signed-in] #authSignInStage, html[data-signed-in] #authOverview,
         <p>Track past creative audits, monitor the compliance drift, and zap issues before campaigns launch to market.</p>
       </div>
       <div style="display:flex;gap:8px;align-items:center;">
-        <button class="btn-pill-ghost" id="historyRangeButton" type="button" aria-label="Change audit date range">📅 All time</button>
-        <button class="btn-pill-ghost" id="historySortButton" type="button" aria-label="Sort audit archive by date">⇕ Newest first</button>
+        <select class="btn-pill-ghost history-dropdown" id="historyRangeButton" aria-label="Filter audit archive by date range">
+          <option value="all">📅 All time</option>
+          <option value="30d">Last 30 days</option>
+          <option value="90d">Last 90 days</option>
+          <option value="year">This year</option>
+        </select>
+        <select class="btn-pill-ghost history-dropdown" id="historySortButton" aria-label="Sort audit archive">
+          <option value="newest">⇕ Newest first</option>
+          <option value="oldest">⇕ Oldest first</option>
+        </select>
         <button class="btn-pill-orange" id="btnHistoryAuditNow">+ Audit Now</button>
       </div>
     </div>
@@ -3162,8 +3218,14 @@ function toast(msg) {
 // -------------------------------------------------------------------------
 // Navigation & Tab Switching
 // -------------------------------------------------------------------------
-function setTab(tabName) {
-  if (tabName === 'team' && activeCompanyRole !== 'Admin') { toast('Only a company admin can open Team Overview.'); return; }
+function canViewTeam() { return currentRole === 'Admin' || activeCompanyRole === 'Admin'; }
+const workspaceTabs = new Set(['workspace', 'guidelines', 'history', 'assets', 'calendar', 'team', 'settings', 'profile']);
+function setTab(tabName, {updateHistory = true, scroll = true} = {}) {
+  if (!workspaceTabs.has(tabName)) return;
+  if (tabName === 'team' && !canViewTeam()) { toast('Only an administrator can open Team Overview.'); return; }
+  if (updateHistory && window.location.hash !== `#${tabName}`) {
+    history.pushState({brandwiseTab: tabName}, '', `#${tabName}`);
+  }
   $$('.nav-link').forEach(link => {
     link.classList.toggle('active', link.dataset.tab === tabName);
   });
@@ -3176,8 +3238,16 @@ function setTab(tabName) {
   if (tabName === 'history') refreshHistoryMetrics();
   if (tabName === 'history') refreshImpactMetrics();
   if (tabName === 'settings') loadAlerts();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (scroll) window.scrollTo({ top: 0, behavior: 'smooth' });
 }
+
+function restoreTabFromLocation() {
+  const requested = window.location.hash.slice(1);
+  const tabName = workspaceTabs.has(requested) && (requested !== 'team' || canViewTeam()) ? requested : 'workspace';
+  setTab(tabName, {updateHistory: false, scroll: false});
+}
+window.addEventListener('popstate', restoreTabFromLocation);
+window.addEventListener('hashchange', restoreTabFromLocation);
 
 const sidebar = $('.sidebar');
 const sidebarToggle = $('#sidebarToggle');
@@ -3321,8 +3391,8 @@ async function loadWorkspaceProfile() {
     select.value = activeCompanyId || '';
     select.disabled = workspaces.length === 0;
     $('#workspaceInviteAdmin').hidden = activeCompanyRole !== 'Admin';
-    $('#adminTeamNav').hidden = activeCompanyRole !== 'Admin';
   } catch (error) { $('#workspaceInviteStatus').textContent = error.message; }
+  finally { $('#adminTeamNav').hidden = !canViewTeam(); }
 }
 async function loadAlerts() {
   const list = $('#settingsAlertsList');
@@ -3548,7 +3618,7 @@ $('#calendarEventTime').value=`${String(initialReminderTime.getHours()).padStart
 setInterval(processCalendarNotifications,15000);
 async function loadAdminTeam() {
   const status=$('#adminTeamStatus'), rows=$('#adminTeamRows');
-  if (!status || activeCompanyRole !== 'Admin') return;
+  if (!status || !canViewTeam()) return;
   status.textContent='Loading team profiles and recent audit activity…';
   try {
     const [team, auditResult]=await Promise.all([accountRequest('/api/admin/team'), api('/api/audits')]);
@@ -3864,8 +3934,11 @@ $('#btnAuditContent').onclick = async () => {
   }
 
   const btn = $('#btnAuditContent');
+  const originalAuditButton = btn.innerHTML;
   btn.disabled = true;
-  btn.innerHTML = `AUDITING...`;
+  btn.classList.add('is-loading');
+  btn.setAttribute('aria-busy', 'true');
+  btn.textContent = 'Checking your draft…';
   const requestStarted = performance.now();
   let aiFallbackReason = '';
   try {
@@ -3877,18 +3950,15 @@ $('#btnAuditContent').onclick = async () => {
     let clientAi = null;
     if (aiEnabled && selectedAi.startsWith('browser-')) {
       const requested = selectedAi === 'browser-3b' ? AI_MODELS.llama3b : AI_MODELS.llama1b;
-      if (browserAiEngine && browserAiModel && (browserAiModel.startsWith(selectedAi === 'browser-3b' ? 'Llama-3.2-3B' : 'Llama-3.2-1B'))) {
-        try {
-          const context = await getAiContext();
-          const findings = await runBrowserAiReview(content, context, browserAiModel);
-          aiProvider = 'browser';
-          clientAi = {model: browserAiModel, findings};
-        } catch (error) {
-          aiFallbackReason = friendlyAiError(error);
-        }
-      } else {
-        aiFallbackReason = 'The in-browser model is still downloading; this audit is running with deterministic checks now.';
-        if (!browserAiLoadPromise) getOrLoadBrowserModel(requested).catch(() => {});
+      try {
+        const context = await getAiContext();
+        const modelId = await getOrLoadBrowserModel(requested);
+        btn.textContent = 'Reviewing with AI…';
+        const findings = await runBrowserAiReview(content, context, modelId);
+        aiProvider = 'browser';
+        clientAi = {model: modelId, findings};
+      } catch (error) {
+        aiFallbackReason = friendlyAiError(error);
       }
     } else if (aiEnabled && selectedAi === 'gemini') {
       aiProvider = 'gemini';
@@ -3923,7 +3993,9 @@ $('#btnAuditContent').onclick = async () => {
     toast(error?.message || 'The audit could not be completed. Your draft remains in the editor.');
   } finally {
     btn.disabled = false;
-    btn.innerHTML = `<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> AUDIT CONTENT ➔`;
+    btn.classList.remove('is-loading');
+    btn.removeAttribute('aria-busy');
+    btn.innerHTML = originalAuditButton;
   }
 };
 
@@ -4341,9 +4413,8 @@ const historyRangeOptions = [
   {key:'year',label:'This year'}
 ];
 function updateHistoryControlLabels() {
-  const range = historyRangeOptions.find(option => option.key === historyRange) || historyRangeOptions[0];
-  $('#historyRangeButton').textContent = `📅 ${range.label}`;
-  $('#historySortButton').textContent = `⇕ ${historySort === 'newest' ? 'Newest first' : 'Oldest first'}`;
+  $('#historyRangeButton').value = historyRange;
+  $('#historySortButton').value = historySort;
 }
 function filterAuditArchive() {
   const q = $('#archiveSearch').value.toLowerCase().trim();
@@ -4371,14 +4442,13 @@ function filterAuditArchive() {
   const summary = $('#historyTableSummary');
   if (summary) summary.textContent = `Showing ${visibleCount} of ${rows.length} saved audit${rows.length === 1 ? '' : 's'} · ${historyRangeOptions.find(option => option.key === historyRange)?.label || 'All time'} · ${historySort === 'newest' ? 'Newest first' : 'Oldest first'}`;
 }
-$('#historyRangeButton').onclick = () => {
-  const index = historyRangeOptions.findIndex(option => option.key === historyRange);
-  historyRange = historyRangeOptions[(index + 1) % historyRangeOptions.length].key;
+$('#historyRangeButton').onchange = event => {
+  historyRange = event.target.value;
   updateHistoryControlLabels();
   filterAuditArchive();
 };
-$('#historySortButton').onclick = () => {
-  historySort = historySort === 'newest' ? 'oldest' : 'newest';
+$('#historySortButton').onchange = event => {
+  historySort = event.target.value;
   updateHistoryControlLabels();
   filterAuditArchive();
 };
@@ -4946,7 +5016,6 @@ passwordToggle.onclick = () => {
 let registration = false;
 let roleQuestions = {};
 let verifiedEmail = '';
-let verifiedEmail = '';
 const registrationEmail = $('#registrationEmail');
 const emailOtpPanel = $('#emailOtpPanel');
 const emailOtpCode = $('#emailOtpCode');
@@ -5074,7 +5143,7 @@ function setRegistration(enabled) {
     field.required = enabled;
   });
   accountForm.elements.password.autocomplete = enabled ? 'new-password' : 'current-password';
-  accountForm.elements.password.minLength = enabled ? 4 : 0;
+  accountForm.elements.password.minLength = enabled ? 12 : 0;
   resetEmailVerification();
   $('#accountTitle').textContent = enabled ? 'Create an account' : 'Sign in';
   $('#accountSubmit').textContent = enabled ? 'Register' : 'Sign in';
@@ -5205,6 +5274,7 @@ accountForm.onsubmit = async event => {
     accountError.textContent = error.message;
   } finally { button.disabled = false; }
 };
+$('#accountSubmit').disabled = false;
 const profileMenu = $('#profileMenu');
 const profileButton = $('#topAvatar');
 const profilePopover = $('#profilePopover');
@@ -5275,7 +5345,6 @@ $('#confirmProfileEmailOtp').onclick = async () => {
     $('#profileEmailStatus').textContent = error.message;
     $('#profileEmailStatus').dataset.state = 'error';
   }
-};
 };
 $('#profileEditForm').onsubmit = async event => {
   event.preventDefault();
@@ -5511,11 +5580,12 @@ async function initializeAccount() {
   $('#roleScopeTag').style.display = 'none';
   $('#view-settings').querySelector('#keyGemini').closest('.white-panel').hidden = user.role !== 'Admin';
   document.documentElement.dataset.signedIn = 'true';
+  restoreTabFromLocation();
   window.scrollTo(0, 0);
   accountForm.reset();
   await loadAuditPreferences();
   if (user.role === 'Admin') loadKeys();
-  if (activeCompanyRole === 'Admin') loadAdminTeam();
+  if (canViewTeam()) loadAdminTeam();
   try {
     const savedDraft = JSON.parse(localStorage.getItem(localKey('unsaved-draft')) || 'null');
     if (savedDraft && !$('#workspaceInput').value.trim() && (savedDraft.content || savedDraft.title) && confirm('Restore the unsaved draft saved in this browser?')) {
@@ -5553,7 +5623,7 @@ aiOption.innerHTML = `
     <div style="display:flex;align-items:center;gap:8px"><progress id="aiModelProgress" max="100" value="0" style="flex:1;height:10px"></progress><button id="cancelAiLoad" class="btn-pill-ghost" type="button" style="margin:0;padding:3px 10px">Cancel</button></div>
     <div id="aiModelProgressText" style="margin-top:4px;color:var(--text-muted)"></div>
   </div>
-  <p id="aiModelDownloadNote" style="margin:6px 0 0 22px;color:var(--text-muted)">First use downloads about 0.7 GB (1B) or 1.8 GB (3B); it is cached afterwards.</p>
+  <p id="aiModelDownloadNote" style="margin:6px 0 0 22px;color:var(--text-muted)">First use downloads about 0.9 GB (1B) or 2.3 GB (3B); it is cached afterwards.</p>
   <details style="margin:6px 0 0 22px;font-size:11px">
     <summary style="cursor:pointer;color:var(--blue-text,var(--blue));font-weight:700">AI and privacy details</summary>
     <p id="aiPrivacyText" style="max-width:720px;margin:6px 0;color:var(--text-muted)">With an in-browser Llama model, the draft is processed in your browser and is not sent to any AI provider. Model weights are downloaded from the internet and cached. AI findings are subjective and need a human. Built with Llama.</p>
@@ -5579,6 +5649,8 @@ let browserAiModel = '';
 let aiLoadGeneration = 0;
 let aiLoadCancelled = false;
 let browserAiLoadPromise = null;
+let cancelAiLoad = null;
+let aiLoadCancelPromise = null;
 
 function updateAiStatus(message, state = '') {
   const status = document.querySelector('#aiReviewStatus');
@@ -5646,11 +5718,17 @@ async function detectBrowserGpu() {
 }
 
 async function loadWebLlmModule() {
-  if (!webllmModulePromise) webllmModulePromise = import(WEBLLM_MODULE_URL);
+  if (!webllmModulePromise) {
+    webllmModulePromise = import(WEBLLM_MODULE_URL).catch(error => {
+      webllmModulePromise = null;
+      throw error;
+    });
+  }
   return webllmModulePromise;
 }
 
 function showAiProgress(report) {
+  if (aiLoadCancelled) return;
   const progress = Math.max(0, Math.min(1, Number(report?.progress) || 0));
   aiModelProgress.value = Math.round(progress * 100);
   aiModelProgressText.textContent = report?.text || 'Preparing the in-browser model…';
@@ -5673,7 +5751,7 @@ async function createBrowserEngine(webllm, modelId, generation) {
       worker.onerror = () => reject(new Error('AI worker failed to start.'));
       worker.onmessageerror = () => reject(new Error('AI worker returned an unreadable message.'));
     });
-    const engine = await Promise.race([initialization, workerFailed]);
+    const engine = await Promise.race([initialization, workerFailed, aiLoadCancelPromise]);
     if (generation !== aiLoadGeneration || aiLoadCancelled) {
       worker.terminate();
       throw new Error('cancelled');
@@ -5685,10 +5763,10 @@ async function createBrowserEngine(webllm, modelId, generation) {
     if (generation !== aiLoadGeneration || aiLoadCancelled) throw new Error('cancelled');
     browserAiWorker = null;
     browserAiWorkerUrl = '';
-    const engine = await webllm.CreateMLCEngine(modelId, {
+    const engine = await Promise.race([webllm.CreateMLCEngine(modelId, {
       initProgressCallback: showAiProgress,
       logLevel: 'WARN'
-    });
+    }), aiLoadCancelPromise]);
     if (generation !== aiLoadGeneration || aiLoadCancelled) throw new Error('cancelled');
     return engine;
   }
@@ -5697,21 +5775,23 @@ async function createBrowserEngine(webllm, modelId, generation) {
 async function ensureBrowserModel(requestedModel) {
   const generation = ++aiLoadGeneration;
   aiLoadCancelled = false;
+  aiLoadCancelPromise = new Promise((_, reject) => { cancelAiLoad = () => reject(new Error('cancelled')); });
   aiModelProgressPanel.hidden = false;
+  aiModelProgressPanel.setAttribute('aria-busy', 'true');
   aiModelProgress.value = 0;
   aiModelProgressText.textContent = 'Loading the in-browser AI engine…';
   updateAiStatus('Preparing the private in-browser model…', 'pending');
   try {
-    const webllm = await loadWebLlmModule();
+    const webllm = await Promise.race([loadWebLlmModule(), aiLoadCancelPromise]);
     const modelList = webllm.prebuiltAppConfig?.model_list || [];
     for (const required of Object.values(AI_MODELS)) {
       if (!modelList.some(item => item.model_id === required)) throw new Error('Required model is not available in this WebLLM build.');
     }
-    const supportsShaderF16 = Boolean((await navigator.gpu.requestAdapter())?.features?.has('shader-f16'));
+    const supportsShaderF16 = Boolean((await Promise.race([navigator.gpu.requestAdapter(), aiLoadCancelPromise]))?.features?.has('shader-f16'));
     const modelId = supportsShaderF16 ? requestedModel : requestedModel.replace('q4f16_1', 'q4f32_1');
     if (!modelList.some(item => item.model_id === modelId)) throw new Error('Selected model variant is not available.');
     if (browserAiEngine && browserAiModel !== modelId && typeof browserAiEngine.reload === 'function') {
-      await browserAiEngine.reload(modelId);
+      await Promise.race([browserAiEngine.reload(modelId), aiLoadCancelPromise]);
     } else if (!browserAiEngine || browserAiModel !== modelId) {
       browserAiEngine = await createBrowserEngine(webllm, modelId, generation);
     }
@@ -5719,12 +5799,17 @@ async function ensureBrowserModel(requestedModel) {
     browserAiModel = modelId;
     aiModelProgress.value = 100;
     aiModelProgressText.textContent = 'Model ready';
+    aiModelProgressPanel.removeAttribute('aria-busy');
     updateAiStatus('Model ready. Your draft stays in this browser.', 'success');
     return modelId;
   } catch (error) {
     aiModelProgressText.textContent = friendlyAiError(error);
+    aiModelProgressPanel.removeAttribute('aria-busy');
     aiModelProgressPanel.hidden = true;
     throw error;
+  } finally {
+    cancelAiLoad = null;
+    aiLoadCancelPromise = null;
   }
 }
 
@@ -5817,6 +5902,7 @@ async function runBrowserAiReview(draft, context, modelId) {
 document.querySelector('#cancelAiLoad').addEventListener('click', () => {
   aiLoadCancelled = true;
   aiLoadGeneration++;
+  cancelAiLoad?.();
   browserAiWorker?.terminate();
   browserAiWorker = null;
   if (browserAiWorkerUrl) URL.revokeObjectURL(browserAiWorkerUrl);
@@ -5824,6 +5910,7 @@ document.querySelector('#cancelAiLoad').addEventListener('click', () => {
   browserAiEngine = null;
   browserAiModel = '';
   aiModelProgressPanel.hidden = true;
+  aiModelProgressPanel.removeAttribute('aria-busy');
   updateAiStatus('AI model loading canceled. Deterministic checks remain available.', 'error');
 });
 
@@ -5854,21 +5941,31 @@ aiProviderSelect.addEventListener('change', () => {
 
 (async () => {
   const gpuAvailable = await detectBrowserGpu();
+  let geminiAvailable = false;
+  try { geminiAvailable = Boolean((await getAiContext()).providers?.gemini); } catch {}
+  const aiAvailable = gpuAvailable || geminiAvailable;
   if (!gpuAvailable) {
-    includeGeminiCheckbox.disabled = true;
-    aiProviderSelect.disabled = true;
-    document.querySelector('#aiModelDownloadNote').textContent = 'AI review needs a WebGPU browser such as desktop Chrome or Edge 113+. Deterministic checks will continue to work.';
-    updateAiStatus('AI review needs a WebGPU browser such as desktop Chrome or Edge 113+.', 'error');
+    [...aiProviderSelect.options].filter(option => option.value.startsWith('browser-')).forEach(option => { option.disabled = true; });
+    if (geminiAvailable) {
+      aiProviderSelect.value = 'gemini';
+      geminiPrivacyText.hidden = false;
+      document.querySelector('#aiModelDownloadNote').textContent = 'In-browser models need WebGPU. Gemini remains available and sends the draft to Google when you run a review.';
+      updateAiStatus('Gemini is available. Your draft is sent to Google only when you run an AI review.');
+    } else {
+      includeGeminiCheckbox.disabled = true;
+      aiProviderSelect.disabled = true;
+      document.querySelector('#aiModelDownloadNote').textContent = 'AI review needs WebGPU or a configured Gemini connection. Deterministic checks will continue to work.';
+      updateAiStatus('AI review is unavailable on this browser and workspace.', 'error');
+    }
   }
   if (defaultAiPreference) {
-    includeGeminiCheckbox.checked = defaultAiPreference.value === 'on' && gpuAvailable;
+    includeGeminiCheckbox.checked = defaultAiPreference.value === 'on' && aiAvailable;
     if (includeGeminiCheckbox.checked) includeGeminiCheckbox.dispatchEvent(new Event('change'));
     defaultAiPreference.addEventListener('change', () => {
-      includeGeminiCheckbox.checked = defaultAiPreference.value === 'on' && gpuAvailable;
+      includeGeminiCheckbox.checked = defaultAiPreference.value === 'on' && aiAvailable;
       includeGeminiCheckbox.dispatchEvent(new Event('change'));
     });
   }
-  getAiContext().catch(() => {});
 })();
 </script></body>
 </html>
