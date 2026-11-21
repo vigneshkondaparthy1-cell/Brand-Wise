@@ -387,7 +387,7 @@ const BrandWiseLayout = {
     </div>
 
     <div style="display:flex;justify-content:flex-end;gap:8px;border-top:1px solid var(--line);padding-top:12px;">
-      <button class="btn-pill-ghost" id="btnDismissDiffModal">Close</button>
+      <button class="btn-pill-ghost" id="btnDismissDiffModal">Back to audit</button>
       <button class="btn-pill-primary" id="btnApproveDiffModal">Approve Revision v2</button>
     </div>
   </div>
@@ -458,7 +458,7 @@ const BrandWiseLayout = {
     </div>
 
     <div style="display:flex;justify-content:flex-end;border-top:1px solid var(--line);padding-top:12px;">
-      <button class="btn-pill-primary" id="btnDismissWcagModal">Done</button>
+      <button class="btn-pill-primary" id="btnDismissWcagModal">Back to audit</button>
     </div>
   </div>
 </div>
@@ -613,7 +613,7 @@ const BrandWiseLayout = {
     <p style="font-size:11px;color:var(--text-muted);border-top:1px solid var(--line);padding-top:10px;">Not implemented: OCR, image/logo review, Google Docs/Canva/Figma, Hindi/regional-language support, and SSO.</p>
 
     <div style="display:flex;justify-content:flex-end;border-top:1px solid var(--line);padding-top:12px;">
-      <button class="btn-pill-primary" id="btnDismissArchModal">Close Architecture</button>
+      <button class="btn-pill-primary" id="btnDismissArchModal">Back to audit</button>
     </div>
   </div>
 </div>

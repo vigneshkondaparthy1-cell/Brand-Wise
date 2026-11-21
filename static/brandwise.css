@@ -962,6 +962,7 @@ table.styled-table tr:hover td { background: var(--card-elevated); }
   transform: none;
   box-shadow: none;
 }
+.workspace-inline-section .btn-close-modal { display: none; }
 .support-card { max-width: 680px; }
 .support-guides { display: grid; grid-template-columns: 1fr; gap: 10px; }
 .support-guides article { display: flex; align-items: flex-start; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--card-elevated); }
