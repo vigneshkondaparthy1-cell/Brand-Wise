@@ -75,7 +75,7 @@ h1, h2, h3, h4, .brand-font {
   font-family: 'Barlow Condensed', Impact, sans-serif;
   font-weight: 900;
   text-transform: uppercase;
-  letter-spacing: -0.025em;
+  letter-spacing: 0.015em;
   color: var(--navy);
 }
 h1 { font-size: 52px; line-height: 0.94; }
@@ -449,6 +449,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--blue); box-shado
   gap: 6px;
 }
 .btn-pill-ghost:hover { background: var(--card-subtle); border-color: var(--line-strong); }
+.history-dropdown { cursor: pointer; font-family: inherit; }
 
 /* Common Panels */
 .white-panel {
@@ -1031,13 +1032,13 @@ table.styled-table tr:hover td { background: var(--card-elevated); }
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #080a0f;
-  --shell: #0b0e14;
-  --card-bg: #11151d;
-  --card-elevated: #0d1016;
-  --card-subtle: #191e28;
-  --line: #252c38;
-  --line-strong: #394353;
+  --bg: #121923;
+  --shell: #172130;
+  --card-bg: #1b2635;
+  --card-elevated: #202d3e;
+  --card-subtle: #26364a;
+  --line: #334359;
+  --line-strong: #4a607a;
   --navy: #f0f5fd;
   --text: #e0e9f5;
   --text-muted: #acbed4;
@@ -1054,6 +1055,9 @@ table.styled-table tr:hover td { background: var(--card-elevated); }
   --amber: #f8c767;
   --shadow-subtle: 0 4px 18px #0003;
   --shadow-card: 0 8px 30px #0004;
+}
+:root[data-theme="dark"] body {
+  background: radial-gradient(ellipse at 50% -24%, #26364a 0%, transparent 56%), var(--bg);
 }
 :root[data-theme="dark"] .pill-blue,
 :root[data-theme="dark"] .btn-pill-ghost { color: #83c7ff; }
@@ -1355,10 +1359,10 @@ html[data-theme="dark"] .delete-account-confirmation { background:color-mix(in s
 #accountGate .password-toggle { position: absolute; top: 50%; right: 4px; transform: translateY(-50%); width: 40px; height: 36px; margin: 0; display: grid; place-items: center; padding: 0; border: 0; border-radius: 8px; color: #64748b; background: transparent; cursor: pointer; }
 .password-toggle:hover { color: #1677c8; background: #eff6ff; }
 .password-toggle svg { width: 19px; height: 19px; }
-:root[data-theme="dark"] #accountGate { color: #e0e9f5; background: #11151d; border-color: #394353; }
+:root[data-theme="dark"] #accountGate { color: #e0e9f5; background: #1b2635; border-color: #4a607a; }
 :root[data-theme="dark"] #accountGate .auth-brand-name { color: #83c7ff; }
 :root[data-theme="dark"] #accountGate .auth-theme-control { color: #acbed4; }
-:root[data-theme="dark"] #accountGate input, :root[data-theme="dark"] #accountGate select { color: #e0e9f5; background: #0d1016; border-color: #394353; }
+:root[data-theme="dark"] #accountGate input, :root[data-theme="dark"] #accountGate select { color: #e0e9f5; background: #141e2b; border-color: #4a607a; }
 :root[data-theme="dark"] #accountGate .password-toggle { color: #acbed4; }
 :root[data-theme="dark"]:not([data-signed-in]) body {
   background: radial-gradient(ellipse at 12% 0%, #493d2d 0%, transparent 42%), radial-gradient(ellipse at 88% 0%, #403244 0%, transparent 40%), #101722;
@@ -2348,8 +2352,12 @@ html[data-signed-in] #authSignInStage, html[data-signed-in] #authOverview,
         <p>Track past creative audits, monitor the compliance drift, and zap issues before campaigns launch to market.</p>
       </div>
       <div style="display:flex;gap:8px;align-items:center;">
-        <button class="btn-pill-ghost" id="historyRangeButton" type="button" aria-label="Change audit date range">📅 All time</button>
-        <button class="btn-pill-ghost" id="historySortButton" type="button" aria-label="Sort audit archive by date">⇕ Newest first</button>
+        <select class="btn-pill-ghost history-dropdown" id="historyRangeButton" aria-label="Filter audit archive by date range">
+          <option value="all">📅 All time</option><option value="30d">Last 30 days</option><option value="90d">Last 90 days</option><option value="year">This year</option>
+        </select>
+        <select class="btn-pill-ghost history-dropdown" id="historySortButton" aria-label="Sort audit archive">
+          <option value="newest">⇕ Newest first</option><option value="oldest">⇕ Oldest first</option>
+        </select>
         <button class="btn-pill-orange" id="btnHistoryAuditNow">+ Audit Now</button>
       </div>
     </div>
@@ -4401,9 +4409,8 @@ const historyRangeOptions = [
   {key:'year',label:'This year'}
 ];
 function updateHistoryControlLabels() {
-  const range = historyRangeOptions.find(option => option.key === historyRange) || historyRangeOptions[0];
-  $('#historyRangeButton').textContent = `📅 ${range.label}`;
-  $('#historySortButton').textContent = `⇕ ${historySort === 'newest' ? 'Newest first' : 'Oldest first'}`;
+  $('#historyRangeButton').value = historyRange;
+  $('#historySortButton').value = historySort;
 }
 function filterAuditArchive() {
   const q = $('#archiveSearch').value.toLowerCase().trim();
@@ -4431,14 +4438,13 @@ function filterAuditArchive() {
   const summary = $('#historyTableSummary');
   if (summary) summary.textContent = `Showing ${visibleCount} of ${rows.length} saved audit${rows.length === 1 ? '' : 's'} · ${historyRangeOptions.find(option => option.key === historyRange)?.label || 'All time'} · ${historySort === 'newest' ? 'Newest first' : 'Oldest first'}`;
 }
-$('#historyRangeButton').onclick = () => {
-  const index = historyRangeOptions.findIndex(option => option.key === historyRange);
-  historyRange = historyRangeOptions[(index + 1) % historyRangeOptions.length].key;
+$('#historyRangeButton').onchange = event => {
+  historyRange = event.target.value;
   updateHistoryControlLabels();
   filterAuditArchive();
 };
-$('#historySortButton').onclick = () => {
-  historySort = historySort === 'newest' ? 'oldest' : 'newest';
+$('#historySortButton').onchange = event => {
+  historySort = event.target.value;
   updateHistoryControlLabels();
   filterAuditArchive();
 };
