@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from .config import settings
 from .store import store
 from .routers import audits, claims, guidelines, visual, insights, integrations, auth, keys
@@ -12,6 +13,7 @@ app = FastAPI(
     docs_url="/api/docs",
     redoc_url="/api/redoc"
 )
+app.mount('/static', StaticFiles(directory=settings.FRONTEND_FILE.parent / 'static'), name='static')
 
 # CORS Middleware
 app.add_middleware(

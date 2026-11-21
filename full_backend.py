@@ -1306,6 +1306,28 @@ class Handler(BaseHTTPRequestHandler):
                 "impactEvidence": impact_evidence
             })
 
+        # Serve only the frontend assets used by the shared page.
+        static_assets = {
+            '/static/theme-init.js',
+            '/static/brandwise-dom.js',
+            '/static/brandwise-layout.js',
+            '/static/brandwise-views.js',
+            '/static/brandwise-components.js',
+            '/static/brandwise-app.js',
+            '/static/brandwise-ai.js',
+            '/static/brandwise.css',
+        }
+        if path in static_assets:
+            asset = ROOT / path.lstrip('/')
+            body = asset.read_bytes()
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/css; charset=utf-8' if path.endswith('.css') else 'application/javascript; charset=utf-8')
+            self.send_header('Content-Length', str(len(body)))
+            self.send_header('X-Content-Type-Options', 'nosniff')
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
         # Serve static HTML or assets
         if path in ('/', '/' + PAGE, '/index.html'):
             target_file = ROOT / PAGE
@@ -1909,7 +1931,7 @@ def init_storage():
         save_json(AUDIT_PREFERENCES_DB, DEFAULT_AUDIT_PREFERENCES)
 
 
-if __name__ == '__main__':
+def serve():
     init_storage()
     threading.Thread(target=session_cleanup_loop, name='session-cleanup', daemon=True).start()
     host = '0.0.0.0' if os.environ.get('RENDER') else '127.0.0.1'
@@ -1925,3 +1947,7 @@ if __name__ == '__main__':
         pass
     finally:
         server.server_close()
+
+
+if __name__ == '__main__':
+    serve()

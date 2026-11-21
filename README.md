@@ -5,11 +5,13 @@ BrandWise is a local content review demo. It checks marketing copy against the c
 ## Run locally
 
 1. Use Python 3.10 or newer.
-2. Copy `.env.example` to `.env` for optional local settings. Registration, profile email verification, and password reset use 6-digit OTP codes sent via Resend (`RESEND_API_KEY` and `RESEND_FROM`). In local development mode, codes are automatically output in the terminal if Resend is not configured. Add `GEMINI_API_KEY` only for optional Gemini review. Rule checks work without an AI key. Set `DATABASE_URL` to use Neon PostgreSQL; optionally set `DATABASE_URL_UNPOOLED` for schema migrations.
+2. Copy `.env.example` to `.env` for optional local settings. Registration, profile email verification, and password reset use 6-digit OTP codes sent via Resend (`RESEND_API_KEY` and `RESEND_FROM`). In local development mode, codes are automatically output in the terminal if Resend is not configured. Browser-local Llama review works without an AI key. Add `GEMINI_API_KEY` only if you want the optional hosted Gemini provider. Set `DATABASE_URL` to use Neon PostgreSQL; optionally set `DATABASE_URL_UNPOOLED` for schema migrations.
 3. Install dependencies with `python -m pip install -r requirements.txt`.
 4. Run `python server.py` and open `http://127.0.0.1:8765`.
 
 The standard-library HTTP server in `server.py` serves `The-Final-Draft-Hackathon-Updated.html` (also mirrored as `index.html`). With `DATABASE_URL`, account/profile/session/verification records and audits, claims, guidelines, and workspace audit preferences are stored in Neon PostgreSQL. Without it, the local demo continues to use SQLite and JSON files. The first Neon startup applies the checked-in SQL migration and imports local JSON data and account password hashes only when the corresponding Neon tables/documents are empty; sessions and pending OTPs are not copied.
+
+The browser page uses `index.html` as its document shell. `static/brandwise-dom.js` provides a native DOM component helper; `static/brandwise-layout.js` mounts the sign in area, app layout, and dialogs; `static/brandwise-views.js` mounts the eight workspace views; `static/brandwise-components.js` mounts shared navigation. These load before `static/brandwise-app.js` binds controls. Styling lives in `static/brandwise.css` and API routes live in Python.
 
 For Render, add `DATABASE_URL` using Neon's pooled connection string. Also add `DATABASE_URL_UNPOOLED` from Neon for the schema migration connection. Keep both values in Render's environment settings and out of source control. The application uses the pooled URL for normal traffic and the direct URL only while applying schema migrations.
 
@@ -38,7 +40,7 @@ New accounts must verify their email with a 6-digit code sent via Resend before 
 
 ## AI and privacy
 
-Deterministic rules run in the app server. When a user enables Gemini review, the draft and approved claims and guidelines used for context are sent to Google Gemini. Account and audit data are stored in Neon when `DATABASE_URL` is configured; otherwise the local SQLite/JSON fallback is used. The OpenAI adapter exists in the codebase but is not currently called by the audit workflow; drafts are not sent to OpenAI. No OCR or pgvector service is part of this running demo.
+Deterministic rules run in the app server. The optional default AI review runs Llama 3.2 1B or 3B through WebLLM in the browser: no provider account or API key is needed, and draft text plus review context are sent to the BrandWise server only for the ordinary audit record and deterministic checks, not to an AI provider. On first use, the browser downloads the selected model weights (about 0.9 GB for 1B or 2.3 GB for 3B) and caches them locally. This needs a compatible WebGPU browser/device and internet access for the model download; if the model cannot load, deterministic checks still run and the app reports that AI review was unavailable. A configured Gemini option remains available; selecting it sends the draft and review context to Google Gemini. Account and audit data are stored in Neon when `DATABASE_URL` is configured; otherwise the local SQLite/JSON fallback is used. The OpenAI adapter exists in the codebase but is not currently called by the audit workflow; drafts are not sent to OpenAI. No OCR or pgvector service is part of this running demo.
 
 ## Limits and security
 
