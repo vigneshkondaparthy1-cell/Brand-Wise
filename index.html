@@ -308,6 +308,9 @@ input:focus, select:focus, textarea:focus { border-color: var(--blue); box-shado
   color: var(--text-muted);
   font-weight: 600;
 }
+.topbar-audit-action { cursor: pointer; color: var(--blue-text, var(--blue)); }
+.topbar-audit-action:hover { background: var(--card-subtle); border-color: var(--line-strong); }
+.topbar-audit-action:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 .topbar-right {
   display: flex;
   align-items: center;
@@ -406,6 +409,23 @@ input:focus, select:focus, textarea:focus { border-color: var(--blue); box-shado
   color: #ffffff !important;
   box-shadow: 0 2px 8px var(--blue-glow);
 }
+.workspace-subnav { gap: 20px; border-bottom: 1px solid var(--line); }
+.workspace-subnav .pill-tag {
+  padding: 8px 2px 10px;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.workspace-subnav .pill-tag:hover { color: var(--text); }
+.workspace-subnav .pill-tag.active {
+  color: var(--blue-text, var(--blue)) !important;
+  background: transparent !important;
+  box-shadow: inset 0 -2px var(--blue);
+}
 
 /* Buttons & Badges */
 .btn-pill-primary {
@@ -450,6 +470,33 @@ input:focus, select:focus, textarea:focus { border-color: var(--blue); box-shado
 }
 .btn-pill-ghost:hover { background: var(--card-subtle); border-color: var(--line-strong); }
 .history-dropdown { cursor: pointer; font-family: inherit; }
+.draft-panel-button { border-radius: 10px; }
+.workspace-action-button {
+  min-height: 40px;
+  justify-content: center;
+  border-radius: 9px;
+  padding: 0 16px;
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 650;
+}
+.workspace-action-button:hover { transform: translateY(-1px); }
+.guidelines-review-link { padding: 0; border: 0; background: transparent; color: var(--blue-text, var(--blue)); font-size: 11px; font-weight: 700; }
+.guidelines-review-link:hover { color: var(--blue-hover); text-decoration: underline; }
+.alert-dispatch-item {
+  width: 100%;
+  justify-content: flex-start;
+  border-radius: 9px;
+  padding: 10px 12px;
+  background: var(--card-elevated);
+  border-color: var(--line);
+  font-size: 11px;
+  line-height: 1.45;
+  text-align: left;
+  white-space: normal;
+}
+.alert-dispatch-item:hover { background: var(--card-subtle); border-color: var(--line-strong); }
+.alert-dispatch-item:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 
 /* Common Panels */
 .white-panel {
@@ -605,7 +652,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--blue); box-shado
   background: var(--amber-light);
   border: 1px solid #fae4be;
   border-radius: var(--radius-md);
-  padding: 12px 14px;
+  padding: 10px 12px;
   display: flex;
   align-items: flex-start;
   gap: 8px;
@@ -642,8 +689,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--blue); box-shado
   flex-direction: column;
   gap: 8px;
   margin-top: 12px;
-  max-height: 240px;
-  overflow-y: auto;
+  min-height: 0;
 }
 .finding-card-item {
   background: var(--card-elevated);
@@ -655,6 +701,12 @@ input:focus, select:focus, textarea:focus { border-color: var(--blue); box-shado
   gap: 4px;
   font-size: 11.5px;
 }
+.suggestion-copy { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.suggestion-copy strong { color: var(--text); font-size: 11.5px; }
+.suggestion-copy span { overflow-wrap: anywhere; }
+.finding-card-item > .finding-actions { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 4px; }
+.finding-actions > div { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; }
+.finding-actions button { border-radius: 7px; }
 .finding-card-item.sev-critical { border-left: 3px solid var(--red); }
 .finding-card-item.sev-high { border-left: 3px solid var(--orange); }
 .finding-card-item.sev-medium { border-left: 3px solid var(--amber); }
@@ -665,9 +717,10 @@ input:focus, select:focus, textarea:focus { border-color: var(--blue); box-shado
 /* ========================================================================= */
 .guidelines-grid {
   display: grid;
-  grid-template-columns: 1.35fr 0.95fr;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.95fr);
   gap: 20px;
 }
+.guidelines-grid > *, #guidelinesRulesList { min-width: 0; }
 .rule-item-box {
   background: var(--card-bg);
   border: 1px solid var(--line);
@@ -683,7 +736,11 @@ input:focus, select:focus, textarea:focus { border-color: var(--blue); box-shado
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 10px;
 }
+.rule-item-header > * { min-width: 0; max-width: 100%; }
+.rule-item-box > div { overflow-wrap: anywhere; }
 .rule-item-header small {
   font-size: 9.5px;
   font-weight: 700;
@@ -1024,6 +1081,9 @@ table.styled-table tr:hover td { background: var(--card-elevated); }
   .four-stat-cards > *, .page-shell .white-panel { min-width: 0; }
   .settings-nav-pane { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .table-container { max-width: 100%; overflow-x: auto; }
+  .guidelines-grid { grid-template-columns: minmax(0, 1fr); }
+  .rule-item-header { align-items: flex-start; }
+  .rule-item-header .pill-tag { white-space: normal; text-align: left; line-height: 1.35; }
 }
 #userRoleSelect { appearance:none; -webkit-appearance:none; width:132px; min-width:0; max-width:132px; padding:4px 2px !important; font-size:12.5px !important; }
 #userRoleSelect::-ms-expand { display:none; }
@@ -1335,7 +1395,7 @@ html[data-theme="dark"] .delete-account-confirmation { background:color-mix(in s
 @media (max-width: 600px) { .brand-asset-toolbar { grid-template-columns:1fr; } .calendar-event-row { grid-template-columns:64px minmax(0,1fr); } .calendar-event-row > :last-child { grid-column:2; } }
 /* Make the audit lifecycle actions easy to see and tap. */
 #governanceActionButtons { display:flex; align-items:center; gap:8px !important; flex-wrap:wrap; }
-#governanceActionButtons button { min-height:34px; padding:7px 13px !important; font-size:12px !important; font-weight:800; }
+#governanceActionButtons button { min-height:34px; padding:7px 13px !important; border-radius:9px; font-size:12px !important; font-weight:800; }
 @media (max-width: 600px) {
   #governanceLifecycle { align-items:stretch !important; flex-direction:column; border-radius:14px !important; }
   #governanceActionButtons button { flex:1 1 auto; }
@@ -1520,6 +1580,74 @@ html[data-signed-in] #authSignInStage, html[data-signed-in] #authOverview,
 @media (max-width: 720px) {
   .auth-demo-grid, .auth-overview-grid { grid-template-columns: minmax(0,1fr); }
   .auth-demo-panel + .auth-demo-panel { border-inline-start: 0; border-top: 1px solid var(--line); }
+}
+/* Keep wide data inside its panel while allowing form and grid columns to shrink. */
+.workspace-split > *, .charts-split > *, .settings-split-layout > *,
+.tiles-grid-2 > *, .four-stat-cards > *, .page-shell > * { min-width: 0; }
+
+#profileEditForm {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+.history-actions, .archive-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+}
+
+@media (min-width: 1051px) and (max-width: 1280px) {
+  .sidebar:not(.collapsed) { width: 208px; padding-inline: 12px; }
+  .page-shell { padding: 24px; }
+  .workspace-split, .settings-split-layout { grid-template-columns: minmax(0, 1fr); }
+  .settings-nav-pane { flex-direction: row; flex-wrap: wrap; }
+}
+@media (min-width: 641px) and (max-width: 1050px) {
+  .page-shell { padding: 24px; }
+  .settings-nav-pane { flex-direction: row; flex-wrap: wrap; }
+}
+@media (max-width: 640px) {
+  .sidebar-nav, .sidebar.collapsed .sidebar-nav {
+    display: flex;
+    flex-flow: row nowrap;
+    overflow-x: auto;
+    padding-block: 3px;
+  }
+  .sidebar-nav .nav-link { flex: none; min-height: 40px; }
+  .sidebar.collapsed .nav-link { margin: 0; }
+  .workspace-subnav { gap: 4px 12px; }
+  .page-shell h1 { font-size: clamp(32px, 8vw, 46px); }
+  .white-panel { padding: 16px; }
+  .panel-kicker-head, .finding-actions, .modal-header { flex-wrap: wrap; gap: 8px; }
+  .page-shell :is(input, select, textarea), .modal-card :is(input, select, textarea) { max-width: 100%; min-width: 0; }
+  #profileEditForm, .profile-password-reset { grid-template-columns: minmax(0, 1fr); }
+  .email-entry-row { flex-wrap: wrap; }
+  .email-entry-row input { flex-basis: 12rem; }
+  .brand-asset-grid { grid-template-columns: minmax(0, 1fr); }
+  .calendar-weekdays, .calendar-days { min-width: 0; }
+  .calendar-day { min-height: 54px; padding: 3px; }
+  .calendar-chip-time { display: none; }
+  .calendar-event-chip { padding: 1px 2px; }
+  .calendar-date-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .settings-general-options { grid-template-columns: minmax(0, 1fr); }
+  .settings-general-options label { min-width: 0; }
+  .threshold-setting { flex-wrap: wrap; gap: 12px; }
+  .threshold-setting > div { min-width: 0; max-width: 100%; }
+  .archive-filters { width: 100%; }
+  .archive-filters label { flex: 1 1 9rem; }
+  .archive-filters label input { display: block; width: 100%; }
+  .modal-overlay { padding: 10px; }
+  .modal-card { max-height: calc(100dvh - 20px); padding: 18px; gap: 14px; }
+}
+@media (max-width: 420px) {
+  .calendar-date-row, .settings-nav-pane { grid-template-columns: minmax(0, 1fr); }
+  .settings-nav-pane { display: flex; flex-flow: row nowrap; overflow-x: auto; }
+  .settings-nav-pane > * { flex: none; }
+  .settings-nav-pane > span { display: none; }
+  .finding-actions > div { justify-content: flex-start; }
 }
 @media (max-width: 480px) {
   #authPageHeader { padding-inline: 12px; gap: 8px; }
@@ -1833,10 +1961,9 @@ html[data-signed-in] #authSignInStage, html[data-signed-in] #authOverview,
 <div class="main-wrapper">
   <!-- Top Bar -->
   <header class="topbar">
-    <div class="topbar-left">
-      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
-      <span>System Engine: Generative Compliance 2.1</span>
-    </div>
+    <button class="topbar-left topbar-audit-action" id="topbarNewAudit" type="button" title="Start a new audit">
+      <span aria-hidden="true">＋</span><span>New audit</span>
+    </button>
 
     <div class="topbar-right">
       <!-- Role Switcher Navigation (Creator, Agency, Reviewer, Brand Manager, Admin) -->
@@ -1878,13 +2005,12 @@ html[data-signed-in] #authSignInStage, html[data-signed-in] #authOverview,
   </header>
 
   <main class="page-shell" id="view-profile" hidden>
-    <div class="kicker-pills" style="margin-bottom:8px;"><span class="pill-tag pill-blue">ACCOUNT</span><span class="pill-tag pill-gray">PROFILE DETAILS</span></div>
     <h1 class="spaced-page-title">MY PROFILE</h1>
     <p>Review and update your account details. Changing your email requires a new verification code.</p>
     <div class="workspace-split" style="align-items:start;margin-top:22px;">
       <section class="white-panel">
         <div class="panel-kicker-head"><h3>Personal details</h3><span class="pill-tag pill-blue" id="profileRoleBadge">ROLE</span></div>
-        <form id="profileEditForm" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:16px;">
+        <form id="profileEditForm">
           <label>Full name<input id="editProfileName" required maxlength="500"></label>
           <label>Username<input id="editProfileUsername" required minlength="3" maxlength="32" pattern="[A-Za-z0-9_]{3,32}"></label>
           <div class="email-verification" style="grid-column:1/-1;">
@@ -2039,11 +2165,11 @@ html[data-signed-in] #authSignInStage, html[data-signed-in] #authOverview,
   <!-- TAB 1: AUDIT WORKSPACE (IMAGE 2)                                         -->
   <!-- ========================================================================= -->
   <main class="page-shell" id="view-workspace">
-    <div class="kicker-pills" style="justify-content:center;">
-      <button type="button" class="pill-tag pill-blue active" id="subtab-ws-live">📍 Live Workspace</button>
-      <button type="button" class="pill-tag pill-gray" id="subtab-ws-diff">⚖️ Version Diff (v1 vs v2)</button>
-      <button type="button" class="pill-tag pill-gray" id="subtab-ws-wcag">🎨 WCAG &amp; Contrast Studio</button>
-      <button type="button" class="pill-tag pill-gray" id="subtab-ws-arch">📜 Prototype Review Flow</button>
+    <div class="kicker-pills workspace-subnav" style="justify-content:center;">
+      <button type="button" class="pill-tag pill-blue active" id="subtab-ws-live">Live workspace</button>
+      <button type="button" class="pill-tag pill-gray" id="subtab-ws-diff">Version diff</button>
+      <button type="button" class="pill-tag pill-gray" id="subtab-ws-wcag">WCAG contrast</button>
+      <button type="button" class="pill-tag pill-gray" id="subtab-ws-arch">Review flow</button>
     </div>
 
     <!-- Centered Hero -->
@@ -2067,18 +2193,17 @@ html[data-signed-in] #authSignInStage, html[data-signed-in] #authOverview,
       <div class="white-panel" style="display:flex;flex-direction:column;gap:12px;">
         <div class="panel-kicker-head">
           <h3><span class="badge-num">01</span> Content To Check</h3>
-          <span class="pill-tag pill-gray" id="docStatePill">WAITING FOR DRAFT</span>
         </div>
         <p style="font-size:12px;color:var(--text-muted);">Draft claims, advertising hooks, and hero statements for automated compliance verification.</p>
         
         <label for="auditTitleInput" style="font-size:11px;font-weight:700;">Audit name</label>
         <input id="auditTitleInput" maxlength="150" placeholder="Name this audit (optional)">
-        <button type="button" class="btn-pill-ghost" id="btnNewAudit" style="align-self:flex-start;margin-top:6px;">Start new audit</button>
+        <button type="button" class="btn-pill-ghost draft-panel-button" id="btnNewAudit" style="align-self:flex-start;margin-top:6px;">Start new audit</button>
         <label for="workspaceInput" style="font-size:11px;font-weight:700;">Draft content</label>
         <textarea class="workspace-textarea" id="workspaceInput" placeholder="Paste marketing copy here..."></textarea>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:6px 0;">
           <input type="file" id="auditDraftFile" accept=".txt,.md,.csv,.pdf,.docx" hidden>
-          <button type="button" class="btn-pill-ghost" id="importAuditDraftButton">Import draft</button>
+          <button type="button" class="btn-pill-ghost draft-panel-button" id="importAuditDraftButton">Import draft</button>
           <span id="draftImportStatus" role="status" aria-live="polite" style="font-size:11px;color:var(--text-muted);margin:0;">Paste a draft to begin. Imported text is shown here before you run checks.</span>
         </div>
         
@@ -2088,15 +2213,15 @@ html[data-signed-in] #authSignInStage, html[data-signed-in] #authOverview,
         </div>
 
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;">
-          <button type="button" class="btn-pill-ghost" style="padding:4px 10px;font-size:10.5px;" id="btnLoadShortNote" title="Approved Claim CLM-001 with up to 20%">Short Note</button>
-          <button type="button" class="btn-pill-ghost" style="padding:4px 10px;font-size:10.5px;" id="btnLoadInstagram" title="Indian English fairness test without tone penalties">Instagram Post</button>
-          <button type="button" class="btn-pill-ghost" style="padding:4px 10px;font-size:10.5px;" id="btnLoadAdHeadline" title="Overpromising 10x claim with replacement">Ad Headline</button>
-          <button type="button" class="btn-pill-ghost" style="padding:4px 10px;font-size:10.5px;" id="btnLoadPrivacy" title="Expired pricing claim CLM-005 ($49/mo) and corporate founding year">Privacy Review</button>
+          <button type="button" class="btn-pill-ghost draft-panel-button" style="padding:4px 10px;font-size:10.5px;" id="btnLoadShortNote" title="Approved Claim CLM-001 with up to 20%">Short Note</button>
+          <button type="button" class="btn-pill-ghost draft-panel-button" style="padding:4px 10px;font-size:10.5px;" id="btnLoadInstagram" title="Indian English fairness test without tone penalties">Instagram Post</button>
+          <button type="button" class="btn-pill-ghost draft-panel-button" style="padding:4px 10px;font-size:10.5px;" id="btnLoadAdHeadline" title="Overpromising 10x claim with replacement">Ad Headline</button>
+          <button type="button" class="btn-pill-ghost draft-panel-button" style="padding:4px 10px;font-size:10.5px;" id="btnLoadPrivacy" title="Expired pricing claim CLM-005 ($49/mo) and corporate founding year">Privacy Review</button>
         </div>
 
         <div style="display:flex;gap:8px;margin-top:6px;border-top:1px dashed var(--line);padding-top:10px;">
-          <button type="button" class="btn-pill-ghost" style="padding:4px 10px;font-size:11px;" id="btnOpenDiffFromPanel">⚖️ View Revision Diff</button>
-          <button type="button" class="btn-pill-ghost" style="padding:4px 10px;font-size:11px;" id="btnOpenWcagFromPanel">🎨 Test WCAG Contrast</button>
+          <button type="button" class="btn-pill-ghost draft-panel-button" style="padding:4px 10px;font-size:11px;" id="btnOpenDiffFromPanel">⚖️ View Revision Diff</button>
+          <button type="button" class="btn-pill-ghost draft-panel-button" style="padding:4px 10px;font-size:11px;" id="btnOpenWcagFromPanel">🎨 Test WCAG Contrast</button>
         </div>
       </div>
 
@@ -2351,7 +2476,7 @@ html[data-signed-in] #authSignInStage, html[data-signed-in] #authOverview,
         <h1 class="spaced-page-title">AUDIT HISTORY &amp; INSIGHTS</h1>
         <p>Track past creative audits, monitor the compliance drift, and zap issues before campaigns launch to market.</p>
       </div>
-      <div style="display:flex;gap:8px;align-items:center;">
+      <div class="history-actions">
         <select class="btn-pill-ghost history-dropdown" id="historyRangeButton" aria-label="Filter audit archive by date range">
           <option value="all">📅 All time</option>
           <option value="30d">Last 30 days</option>
@@ -2457,7 +2582,7 @@ html[data-signed-in] #authSignInStage, html[data-signed-in] #authOverview,
           <h3>Audit Archive Log</h3>
           <p style="font-size:11.5px;">Historical demo rows are marked as sample data; live metrics exclude them.</p>
         </div>
-        <div style="display:flex;gap:8px;">
+        <div class="archive-filters">
           <input type="text" id="archiveSearch" placeholder="Search audit name or reviewer..." aria-label="Search audit name or reviewer" style="width:230px;border-radius:var(--radius-pill);padding:6px 14px;">
           <label style="font-size:11px;color:var(--text-muted)">From <input type="date" id="archiveDateFrom" aria-label="Filter audits from date"></label>
           <label style="font-size:11px;color:var(--text-muted)">To <input type="date" id="archiveDateTo" aria-label="Filter audits through date"></label>
@@ -2695,43 +2820,29 @@ html[data-signed-in] #authSignInStage, html[data-signed-in] #authOverview,
         <!-- Preference summaries are shown only in the section they describe. -->
         <div class="tiles-grid-2" data-settings-grid>
           <div class="white-panel" data-settings-panel="profile" style="padding:16px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;">
-              <small style="font-size:9.5px;font-weight:700;color:var(--text-dim);text-transform:uppercase;">TARGET WORKSPACE</small>
-              <span>⚙</span>
-            </div>
-            <div style="font-size:16px;font-weight:800;color:var(--navy);margin:4px 0 8px;" id="activeWorkspaceName">Private workspace</div>
-            <div style="display:flex;gap:6px;font-size:10px;">
-              <span class="pill-tag pill-gray" id="activeWorkspaceRole">Private to you</span>
-              <span class="pill-tag pill-blue" id="activeWorkspaceCount">1 workspace</span>
-            </div>
+            <div style="font-size:16px;font-weight:800;color:var(--navy);margin:0 0 4px;" id="activeWorkspaceName">Private workspace</div>
+            <p id="activeWorkspaceRole" style="font-size:12px;margin:0 0 12px;">Private to you</p>
             <label for="workspaceSwitcher" style="display:block;margin-top:14px;font-weight:700;font-size:11px;">Switch company</label>
             <select id="workspaceSwitcher" aria-label="Switch company workspace"><option value="">Private workspace</option></select>
             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
               <input id="newWorkspaceName" placeholder="New company name" aria-label="New company name" style="flex:1;min-width:150px;">
-              <button class="btn-pill-primary" id="createWorkspaceButton" type="button">Create company</button>
+              <button class="btn-pill-primary workspace-action-button" id="createWorkspaceButton" type="button">Create company</button>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
               <input id="workspaceInviteCode" placeholder="Invitation code" aria-label="Company invitation code" style="flex:1;min-width:150px;">
-              <button class="btn-pill-ghost" id="joinWorkspaceButton" type="button">Join company</button>
+              <button class="btn-pill-ghost workspace-action-button" id="joinWorkspaceButton" type="button">Join company</button>
             </div>
             <div id="workspaceInviteAdmin" hidden style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
               <input id="workspaceInviteEmail" type="email" placeholder="Teammate's verified email" aria-label="Invitee verified email" style="flex:1;min-width:150px;">
               <select id="workspaceInviteRole" aria-label="Company role"><option>Creator</option><option>External Agency</option><option>Reviewer</option><option>Brand Manager</option></select>
-              <button class="btn-pill-ghost" id="createWorkspaceInviteButton" type="button">Create invitation</button>
+              <button class="btn-pill-ghost workspace-action-button" id="createWorkspaceInviteButton" type="button">Create invitation</button>
             </div>
             <div id="workspaceInviteStatus" role="status" style="font-size:11px;margin-top:6px;"></div>
           </div>
 
           <div class="white-panel" data-settings-panel="profile" style="padding:16px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;">
-              <small style="font-size:9.5px;font-weight:700;color:var(--text-dim);text-transform:uppercase;">CONNECTED PARTNER</small>
-              <span>🏢</span>
-            </div>
-            <div style="font-size:16px;font-weight:800;color:var(--navy);margin:4px 0 8px;">Workspace membership</div>
-            <div style="display:flex;gap:6px;font-size:10px;">
-              <span class="pill-tag pill-gray">Email-bound invitations</span>
-              <span class="pill-tag pill-blue">Shared company data</span>
-            </div>
+            <div style="font-size:16px;font-weight:800;color:var(--navy);margin:0 0 4px;">Workspace membership</div>
+            <p style="font-size:12px;margin:0;">Invitations are linked to email. Company data is shared with workspace members.</p>
           </div>
 
           <div class="white-panel" data-settings-panel="visual" style="padding:16px;">
@@ -2751,14 +2862,9 @@ html[data-signed-in] #authSignInStage, html[data-signed-in] #authOverview,
           </div>
 
           <div class="white-panel" data-settings-panel="brand" style="padding:16px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;">
-              <small style="font-size:9.5px;font-weight:700;color:var(--text-dim);text-transform:uppercase;">AUDITING GUIDELINES</small>
-              <span>🛡</span>
-            </div>
-            <div style="font-size:16px;font-weight:800;color:var(--navy);margin:4px 0 8px;">v2.4 <span style="font-size:11px;font-weight:600;color:var(--text-dim);">Updated 2 days ago</span></div>
-            <div style="display:flex;gap:6px;font-size:10px;">
-              <button class="btn-pill-ghost" id="btnReviewGuidelines" type="button" style="padding:5px 10px;font-size:10px;">Review current rules</button>
-            </div>
+            <div style="font-size:14px;font-weight:750;color:var(--navy);">Auditing guidelines</div>
+            <div style="font-size:11px;color:var(--text-muted);margin:4px 0 10px;">v2.4 <span aria-hidden="true">·</span> Updated 2 days ago</div>
+            <button class="guidelines-review-link" id="btnReviewGuidelines" type="button">Review current rules →</button>
           </div>
         </div>
 
@@ -2786,7 +2892,7 @@ html[data-signed-in] #authSignInStage, html[data-signed-in] #authOverview,
             <span id="auditPreferenceSyncStatus" role="status" style="display:block;margin-top:5px;font-weight:700;color:var(--blue-text,var(--blue));">Loading shared settings…</span>
           </p>
 
-          <div style="display:flex;align-items:center;justify-content:space-between;background:var(--card-elevated);border:1px solid var(--line);border-radius:var(--radius-md);padding:14px 18px;">
+          <div class="threshold-setting" style="display:flex;align-items:center;justify-content:space-between;background:var(--card-elevated);border:1px solid var(--line);border-radius:var(--radius-md);padding:14px 18px;">
             <div>
               <strong style="font-family:'Barlow Condensed',sans-serif;font-size:28px;color:var(--navy);line-height:1;" id="thresholdDisplayVal">80%</strong>
               <div style="font-size:11px;font-weight:700;color:var(--navy);">Target Passing Score</div>
@@ -3383,8 +3489,7 @@ async function loadWorkspaceProfile() {
     const active = workspaces.find(item => item.id === activeCompanyId);
     activeCompanyRole = active?.role || null;
     $('#activeWorkspaceName').textContent = active?.name || 'Private workspace';
-    $('#activeWorkspaceRole').textContent = activeCompanyRole || 'Private to you';
-    $('#activeWorkspaceCount').textContent = `${workspaces.length || 1} workspace${workspaces.length === 1 ? '' : 's'}`;
+    $('#activeWorkspaceRole').textContent = activeCompanyRole ? `${activeCompanyRole} access` : 'Private to you';
     const select = $('#workspaceSwitcher');
     select.replaceChildren(new Option('Private workspace', ''));
     workspaces.forEach(item => select.add(new Option(`${item.name} · ${item.role}`, item.id)));
@@ -3404,8 +3509,7 @@ async function loadAlerts() {
     list.replaceChildren();
     if (!alerts.length) { list.textContent = 'No active review alerts for this company.'; return; }
     alerts.forEach(alert => {
-      const item = document.createElement('button'); item.type = 'button'; item.className = 'btn-pill-ghost';
-      item.style.cssText = 'text-align:left;white-space:normal';
+      const item = document.createElement('button'); item.type = 'button'; item.className = 'btn-pill-ghost alert-dispatch-item';
       item.textContent = `${alert.title || 'Untitled audit'} · ${alert.status || 'Review needed'}`;
       item.onclick = () => openAuditRecord(alert.id);
       list.append(item);
@@ -4046,13 +4150,11 @@ function renderAuditReport(res) {
     const topF = findings[0];
     $('#reportSuggestionBox').style.display = 'flex';
     $('#reportSuggestionBox').innerHTML = `
-      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
-      <div style="flex:1;">
-        <b>${escapeHTML(topF.title)}:</b> Replace <i>"${escapeHTML(topF.wrong)}"</i> with <i>"${escapeHTML(topF.fix || 'approved terminology')}"</i> (${escapeHTML(topF.sourceId || 'Brand Standard')}).
-        <div style="margin-top:6px;">
-          <button type="button" class="btn-pill-orange" style="padding:2px 8px;font-size:10px;" id="btnApplyTopFix">Apply One-Click Fix</button>
-        </div>
+      <div class="suggestion-copy">
+        <strong>Suggested fix · ${escapeHTML(topF.title)}</strong>
+        <span>Use “${escapeHTML(topF.fix || 'approved terminology')}” · ${escapeHTML(topF.sourceId || 'Brand Standard')}</span>
       </div>
+      <button type="button" class="btn-pill-orange" style="padding:6px 10px;font-size:10px;white-space:nowrap;" id="btnApplyTopFix">Apply fix</button>
     `;
 
     $('#btnApplyTopFix').onclick = () => {
@@ -4085,7 +4187,7 @@ function renderAuditReport(res) {
       <div style="color:var(--text-muted);font-size:11px;">${escapeHTML(f.why)}</div>
       ${confidenceLabel ? `<div style="color:var(--text-dim);font-size:10px;margin-top:3px;">Confidence: ${escapeHTML(confidenceLabel)}</div>` : ''}
       <details style="margin-top:6px;font-size:10.5px;">
-        <summary style="cursor:pointer;color:var(--blue-text,var(--blue));font-weight:700;">Evidence and finding details</summary>
+        <summary style="cursor:pointer;color:var(--blue-text,var(--blue));font-weight:700;">Evidence &amp; details</summary>
         <div style="display:grid;gap:4px;margin-top:6px;padding:9px 10px;border-radius:8px;background:var(--card-elevated);line-height:1.45;">
           <div><b>Matched wording:</b> ${escapeHTML(f.wrong || 'Not specified')}</div>
           <div><b>Source:</b> ${escapeHTML(f.sourceId || 'No source linked')} · ${escapeHTML(f.official || 'No evidence reference supplied')}</div>
@@ -4096,7 +4198,7 @@ function renderAuditReport(res) {
           ${f.reportedIncorrect ? `<div><b>Feedback:</b> Reported as potentially incorrect${f.incorrectFeedback ? ` - ${escapeHTML(f.incorrectFeedback)}` : ''}</div>` : ''}
         </div>
       </details>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
+      <div class="finding-actions">
         <span style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--blue-text, var(--blue));">${escapeHTML(f.sourceId || 'LEDGER')}</span>
         <div style="display:flex;gap:4px;">
           ${f.actionStatus === 'accepted' ? '<span class="pill-tag pill-blue">Fix accepted</span>' : ''}
@@ -4243,6 +4345,7 @@ function startNewAudit() {
   $('#workspaceInput').focus();
 }
 $('#btnNewAudit').onclick = startNewAudit;
+$('#topbarNewAudit').onclick = () => { setTab('workspace'); startNewAudit(); };
 
 // -------------------------------------------------------------------------
 // Governance Lifecycle Actions (Approve, Request Changes, Publish)
