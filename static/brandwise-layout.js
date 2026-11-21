@@ -250,10 +250,6 @@ const BrandWiseLayout = {
 <div class="main-wrapper">
   <!-- Top Bar -->
   <header class="topbar">
-    <button class="topbar-left topbar-audit-action" id="topbarNewAudit" type="button" title="Start a new audit">
-      <span aria-hidden="true">＋</span><span>New audit</span>
-    </button>
-
     <div class="topbar-right">
       <!-- Role Switcher Navigation (Creator, Agency, Reviewer, Brand Manager, Admin) -->
       <div style="display:flex;align-items:center;gap:6px;background:var(--card-elevated);border:1px solid var(--line);padding:3px 10px;border-radius:var(--radius-pill);font-size:11px;font-weight:700;">
@@ -287,9 +283,11 @@ const BrandWiseLayout = {
             <div><dt>Organization</dt><dd id="profileOrganization"></dd></div>
             <div><dt>Work</dt><dd id="profileWork"></dd></div>
           </dl>
+          <div class="profile-popover-actions">
+            <button class="btn-pill-ghost profile-sign-out" id="accountSignOut" type="button">Sign out</button>
+          </div>
         </section>
       </div>
-      <button class="btn-pill-ghost" id="accountSignOut" type="button">Sign out</button>
     </div>
   </header>
 
@@ -443,7 +441,7 @@ const BrandWiseLayout = {
             <div style="font-size:10px;color:var(--text-dim);font-weight:700;text-transform:uppercase;">FLESCH-KINCAID GRADE</div>
             <strong style="font-family:'Barlow Condensed',sans-serif;font-size:28px;color:var(--navy);" id="readabilityGrade">Not checked yet</strong>
             <p style="font-size:11px;margin-top:2px;">Guideline limit: Grade 12. Syllable counts are estimated.</p>
-            <button type="button" class="btn-pill-ghost" id="btnCheckAccessibilityCopy" style="margin-top:8px;padding:5px 9px;font-size:10px;">Check workspace copy</button>
+            <button type="button" class="btn-pill-ghost" id="btnCheckAccessibilityCopy">Check workspace copy</button>
             <p id="headingOrderStatus" role="status" style="font-size:10.5px;margin-top:7px;color:var(--text-muted);">Heading order: not checked</p>
           </div>
 

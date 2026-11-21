@@ -1060,7 +1060,6 @@ function startNewAudit() {
   $('#workspaceInput').focus();
 }
 $('#btnNewAudit').onclick = startNewAudit;
-$('#topbarNewAudit').onclick = () => { setTab('workspace'); startNewAudit(); };
 
 // -------------------------------------------------------------------------
 // Governance Lifecycle Actions (Approve, Request Changes, Publish)
