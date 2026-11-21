@@ -337,7 +337,7 @@ const BrandWiseLayout = {
 `),
   diffDialog: () => component(`
 <div class="modal-overlay" id="modalDiff">
-  <div class="modal-card">
+  <div class="modal-card review-panel">
     <div class="modal-header">
       <div>
         <h3>Version Comparison &amp; Reviewer Discussion</h3>
@@ -395,7 +395,7 @@ const BrandWiseLayout = {
 `),
   contrastDialog: () => component(`
 <div class="modal-overlay" id="modalWcag">
-  <div class="modal-card">
+  <div class="modal-card review-panel">
     <div class="modal-header">
       <div>
         <h3>Visual &amp; Accessibility Studio</h3>
@@ -562,7 +562,7 @@ const BrandWiseLayout = {
 `),
   flowDialog: () => component(`
 <div class="modal-overlay" id="modalArch">
-  <div class="modal-card">
+  <div class="modal-card review-panel">
     <div class="modal-header">
       <div>
         <h3>Prototype Review Flow</h3>
