@@ -1,0 +1,98 @@
+--- a/index.html
++++ b/index.html
+@@ -711,18 +711,32 @@
+   background: linear-gradient(135deg, #102644, #19385f);
+   color: #fff;
+   border-radius: var(--radius-lg);
+-  padding: 20px 24px;
++  padding: 24px 28px;
+   position: relative;
+   overflow: hidden;
+ }
++.banner-playful small {
++  display: block;
++  color: #ffad75;
++  font-size: 12px;
++  font-weight: 800;
++  letter-spacing: .08em;
++  line-height: 1.4;
++  text-transform: uppercase;
++}
+ .banner-playful h4 {
+   color: #fff;
+-  font-size: 20px;
+-  margin-bottom: 4px;
++  font-family: 'Inter', system-ui, sans-serif;
++  font-size: clamp(20px, 2vw, 24px);
++  font-weight: 800;
++  letter-spacing: 0;
++  line-height: 1.2;
++  margin: 8px 0;
+ }
+ .banner-playful p {
+-  color: #b0c5e2;
+-  font-size: 11.5px;
++  color: #d5e5f8;
++  font-size: 14px;
++  line-height: 1.5;
+ }
+ 
+ /* ========================================================================= */
+@@ -2282,7 +2296,7 @@
+ 
+         <!-- Playful Banner -->
+         <div class="banner-playful">
+-          <small style="font-size:9px;font-weight:800;letter-spacing:0.1em;color:var(--orange);text-transform:uppercase;">PLAYFUL FACT</small>
++          <small>PLAYFUL FACT</small>
+           <h4>NO BORING POLICIES.</h4>
+           <p>Creative freedom lives inside crystal clear boundaries.</p>
+         </div>
+--- a/The-Final-Draft-Hackathon-Updated.html
++++ b/The-Final-Draft-Hackathon-Updated.html
+@@ -711,18 +711,32 @@
+   background: linear-gradient(135deg, #102644, #19385f);
+   color: #fff;
+   border-radius: var(--radius-lg);
+-  padding: 20px 24px;
++  padding: 24px 28px;
+   position: relative;
+   overflow: hidden;
+ }
++.banner-playful small {
++  display: block;
++  color: #ffad75;
++  font-size: 12px;
++  font-weight: 800;
++  letter-spacing: .08em;
++  line-height: 1.4;
++  text-transform: uppercase;
++}
+ .banner-playful h4 {
+   color: #fff;
+-  font-size: 20px;
+-  margin-bottom: 4px;
++  font-family: 'Inter', system-ui, sans-serif;
++  font-size: clamp(20px, 2vw, 24px);
++  font-weight: 800;
++  letter-spacing: 0;
++  line-height: 1.2;
++  margin: 8px 0;
+ }
+ .banner-playful p {
+-  color: #b0c5e2;
+-  font-size: 11.5px;
++  color: #d5e5f8;
++  font-size: 14px;
++  line-height: 1.5;
+ }
+ 
+ /* ========================================================================= */
+@@ -2282,7 +2296,7 @@
+ 
+         <!-- Playful Banner -->
+         <div class="banner-playful">
+-          <small style="font-size:9px;font-weight:800;letter-spacing:0.1em;color:var(--orange);text-transform:uppercase;">PLAYFUL FACT</small>
++          <small>PLAYFUL FACT</small>
+           <h4>NO BORING POLICIES.</h4>
+           <p>Creative freedom lives inside crystal clear boundaries.</p>
+         </div>

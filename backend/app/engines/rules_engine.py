@@ -37,6 +37,7 @@ class RulesEngine:
                         })
                 continue
 
+            # Prohibited terminology detection
             if term in content_lower:
                 start_idx = content_lower.find(term)
                 actual_text = content[start_idx:start_idx+len(term)]
@@ -53,10 +54,12 @@ class RulesEngine:
                     "owner": "Brand Governance Council",
                     "expiry": "Active guideline",
                     "state": "source-verified",
-                    "confidence": 97,
+                    "confidence": 100,
+                    "confidenceBasis": "Exact deterministic rule match",
                     "fix": p.get("suggested", ""),
                     "actionStatus": "pending"
                 })
+                continue
 
         # 2. General Superlatives and Absolute Guarantees without Evidence (PDF Page 3 & 4)
         superlatives_pattern = r'\b(world[’\']?s\s+(?:leading|best|fastest|number\s*one)|#(?:1|one)\s+(?:provider|platform|solution)|100%\s+(?:guaranteed|accurate|reliable)|guaranteed\s+(?:results|success|growth)|trusted\s+by\s+every\s+(?:company|enterprise|team))\b'
@@ -84,7 +87,7 @@ class RulesEngine:
         # 3. Mandatory Legal Disclaimer
         req_disc = guidelines.get("requiredDisclaimer", "").strip()
         if channel in ["Website Copy", "Digital Ad", "Marketing Email"] and req_disc:
-            if "terms and conditions apply" not in content_lower and "terms & conditions" not in content_lower:
+            if req_disc.casefold() not in content_lower:
                 findings.append({
                     "id": f"FND-RUL-DISC-{len(findings)+1}",
                     "location": "Document footer",

@@ -1,0 +1,141 @@
+--- a/accounts.py
++++ b/accounts.py
+@@ -590,9 +590,11 @@
+ 
+ def list_workspace_users(headers):
+     user = current_user(headers)
++    if user and user['role'] == 'Admin':
++        return list_users()
+     membership = active_membership(headers)
+     if not user or not membership or membership['role'] != 'Admin':
+-        raise PermissionError('Only a company admin can open Team Overview.')
++        raise PermissionError('Only an administrator can open Team Overview.')
+     with closing(connect()) as db:
+         rows = db.execute("""SELECT accounts.username, accounts.email, accounts.name, accounts.role,
+                                    accounts.organization, accounts.work, accounts.responsibilities,
+--- a/index.html
++++ b/index.html
+@@ -230,6 +230,7 @@
+ .sidebar.collapsed .nav-link.active { color: #fff; background: var(--blue); box-shadow: 0 5px 14px var(--blue-glow); }
+ .sidebar.collapsed .nav-link svg { width: 20px; height: 20px; }
+ :root[data-theme="dark"] .sidebar.collapsed .nav-link:not(.active) { color: var(--blue-text); }
++.sidebar-nav .nav-link[hidden] { display: none; }
+ 
+ .sidebar-bottom-score {
+   background: var(--card-bg);
+@@ -3183,8 +3184,9 @@
+ // -------------------------------------------------------------------------
+ // Navigation & Tab Switching
+ // -------------------------------------------------------------------------
++function canViewTeam() { return currentRole === 'Admin' || activeCompanyRole === 'Admin'; }
+ function setTab(tabName) {
+-  if (tabName === 'team' && activeCompanyRole !== 'Admin') { toast('Only a company admin can open Team Overview.'); return; }
++  if (tabName === 'team' && !canViewTeam()) { toast('Only an administrator can open Team Overview.'); return; }
+   $$('.nav-link').forEach(link => {
+     link.classList.toggle('active', link.dataset.tab === tabName);
+   });
+@@ -3342,8 +3344,8 @@
+     select.value = activeCompanyId || '';
+     select.disabled = workspaces.length === 0;
+     $('#workspaceInviteAdmin').hidden = activeCompanyRole !== 'Admin';
+-    $('#adminTeamNav').hidden = activeCompanyRole !== 'Admin';
+   } catch (error) { $('#workspaceInviteStatus').textContent = error.message; }
++  finally { $('#adminTeamNav').hidden = !canViewTeam(); }
+ }
+ async function loadAlerts() {
+   const list = $('#settingsAlertsList');
+@@ -3569,7 +3571,7 @@
+ setInterval(processCalendarNotifications,15000);
+ async function loadAdminTeam() {
+   const status=$('#adminTeamStatus'), rows=$('#adminTeamRows');
+-  if (!status || activeCompanyRole !== 'Admin') return;
++  if (!status || !canViewTeam()) return;
+   status.textContent='Loading team profiles and recent audit activity…';
+   try {
+     const [team, auditResult]=await Promise.all([accountRequest('/api/admin/team'), api('/api/audits')]);
+@@ -5535,7 +5537,7 @@
+   accountForm.reset();
+   await loadAuditPreferences();
+   if (user.role === 'Admin') loadKeys();
+-  if (activeCompanyRole === 'Admin') loadAdminTeam();
++  if (canViewTeam()) loadAdminTeam();
+   try {
+     const savedDraft = JSON.parse(localStorage.getItem(localKey('unsaved-draft')) || 'null');
+     if (savedDraft && !$('#workspaceInput').value.trim() && (savedDraft.content || savedDraft.title) && confirm('Restore the unsaved draft saved in this browser?')) {
+--- a/The-Final-Draft-Hackathon-Updated.html
++++ b/The-Final-Draft-Hackathon-Updated.html
+@@ -230,6 +230,7 @@
+ .sidebar.collapsed .nav-link.active { color: #fff; background: var(--blue); box-shadow: 0 5px 14px var(--blue-glow); }
+ .sidebar.collapsed .nav-link svg { width: 20px; height: 20px; }
+ :root[data-theme="dark"] .sidebar.collapsed .nav-link:not(.active) { color: var(--blue-text); }
++.sidebar-nav .nav-link[hidden] { display: none; }
+ 
+ .sidebar-bottom-score {
+   background: var(--card-bg);
+@@ -3183,8 +3184,9 @@
+ // -------------------------------------------------------------------------
+ // Navigation & Tab Switching
+ // -------------------------------------------------------------------------
++function canViewTeam() { return currentRole === 'Admin' || activeCompanyRole === 'Admin'; }
+ function setTab(tabName) {
+-  if (tabName === 'team' && activeCompanyRole !== 'Admin') { toast('Only a company admin can open Team Overview.'); return; }
++  if (tabName === 'team' && !canViewTeam()) { toast('Only an administrator can open Team Overview.'); return; }
+   $$('.nav-link').forEach(link => {
+     link.classList.toggle('active', link.dataset.tab === tabName);
+   });
+@@ -3342,8 +3344,8 @@
+     select.value = activeCompanyId || '';
+     select.disabled = workspaces.length === 0;
+     $('#workspaceInviteAdmin').hidden = activeCompanyRole !== 'Admin';
+-    $('#adminTeamNav').hidden = activeCompanyRole !== 'Admin';
+   } catch (error) { $('#workspaceInviteStatus').textContent = error.message; }
++  finally { $('#adminTeamNav').hidden = !canViewTeam(); }
+ }
+ async function loadAlerts() {
+   const list = $('#settingsAlertsList');
+@@ -3569,7 +3571,7 @@
+ setInterval(processCalendarNotifications,15000);
+ async function loadAdminTeam() {
+   const status=$('#adminTeamStatus'), rows=$('#adminTeamRows');
+-  if (!status || activeCompanyRole !== 'Admin') return;
++  if (!status || !canViewTeam()) return;
+   status.textContent='Loading team profiles and recent audit activity…';
+   try {
+     const [team, auditResult]=await Promise.all([accountRequest('/api/admin/team'), api('/api/audits')]);
+@@ -5535,7 +5537,7 @@
+   accountForm.reset();
+   await loadAuditPreferences();
+   if (user.role === 'Admin') loadKeys();
+-  if (activeCompanyRole === 'Admin') loadAdminTeam();
++  if (canViewTeam()) loadAdminTeam();
+   try {
+     const savedDraft = JSON.parse(localStorage.getItem(localKey('unsaved-draft')) || 'null');
+     if (savedDraft && !$('#workspaceInput').value.trim() && (savedDraft.content || savedDraft.title) && confirm('Restore the unsaved draft saved in this browser?')) {
+--- /dev/null
++++ b/tests/test_team_admin_access.py
+@@ -0,0 +1,25 @@
++import unittest
++from unittest.mock import patch
++
++import accounts
++
++
++class TeamAdminAccessTests(unittest.TestCase):
++    def test_account_admin_can_view_team_without_active_company(self):
++        people = [{'username': 'editor', 'role': 'Creator'}]
++        with patch.object(accounts, 'current_user', return_value={'username': 'admin', 'role': 'Admin', 'activeCompanyId': None}), \
++             patch.object(accounts, 'list_users', return_value=people) as list_users:
++            self.assertEqual(accounts.list_workspace_users({}), people)
++            list_users.assert_called_once_with()
++
++    def test_non_admin_without_company_admin_membership_is_denied(self):
++        with patch.object(accounts, 'current_user', return_value={'username': 'editor', 'role': 'Creator'}), \
++             patch.object(accounts, 'active_membership', return_value=None), \
++             patch.object(accounts, 'list_users') as list_users:
++            with self.assertRaises(PermissionError):
++                accounts.list_workspace_users({})
++            list_users.assert_not_called()
++
++
++if __name__ == '__main__':
++    unittest.main()

@@ -11,6 +11,8 @@ BrandWise is a local content review demo. It checks marketing copy against the c
 
 The standard-library HTTP server in `server.py` serves `The-Final-Draft-Hackathon-Updated.html` (also mirrored as `index.html`). With `DATABASE_URL`, account/profile/session/verification records and audits, claims, guidelines, and workspace audit preferences are stored in Neon PostgreSQL. Without it, the local demo continues to use SQLite and JSON files. The first Neon startup applies the checked-in SQL migration and imports local JSON data and account password hashes only when the corresponding Neon tables/documents are empty; sessions and pending OTPs are not copied.
 
+The browser page uses `index.html` as its document shell. `static/brandwise-dom.js` provides a native DOM component helper; `static/brandwise-layout.js` mounts the sign in area, app layout, and dialogs; `static/brandwise-views.js` mounts the eight workspace views; `static/brandwise-components.js` mounts shared navigation. These load before `static/brandwise-app.js` binds controls. Styling lives in `static/brandwise.css` and API routes live in Python.
+
 For Render, add `DATABASE_URL` using Neon's pooled connection string. Also add `DATABASE_URL_UNPOOLED` from Neon for the schema migration connection. Keep both values in Render's environment settings and out of source control. The application uses the pooled URL for normal traffic and the direct URL only while applying schema migrations.
 
 ## Email Authentication (Resend)

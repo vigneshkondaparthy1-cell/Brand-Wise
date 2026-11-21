@@ -6,6 +6,7 @@ from http.cookies import SimpleCookie, CookieError
 from pathlib import Path
 import json
 import ipaddress
+import logging
 import os
 import re
 import secrets
@@ -102,34 +103,57 @@ LOGIN_WINDOW_SECONDS = 900
 LOGIN_MAX_FAILURES = 5
 LOGIN_LOCK_SECONDS = 300
 
-def login_is_limited(client_ip):
+def request_client_ip(headers, remote_addr):
+    """Use the edge-provided visitor address only on Render's trusted ingress."""
+    candidates = []
+    if os.environ.get('RENDER'):
+        candidates.append(headers.get('CF-Connecting-IP', ''))
+        # Render appends to X-Forwarded-For; ignore caller-supplied left entries.
+        candidates.append((headers.get('X-Forwarded-For', '').split(',')[-1]).strip())
+    candidates.append(remote_addr or '127.0.0.1')
+    for candidate in candidates:
+        try:
+            return ipaddress.ip_address(candidate).compressed
+        except ValueError:
+            continue
+    return '127.0.0.1'
+
+def _login_failure_keys(client_ip, identifier=None):
+    keys = [ipaddress.ip_address(client_ip).compressed]
+    if isinstance(identifier, str) and identifier.strip():
+        normalized = identifier.strip().casefold()[:254]
+        keys.append('account:' + sha256(normalized.encode('utf-8')).hexdigest())
+    return keys
+
+def login_is_limited(client_ip, identifier=None):
     now = int(time.time())
     cutoff = now - LOGIN_WINDOW_SECONDS
-    client_ip = ipaddress.ip_address(client_ip).compressed
+    keys = _login_failure_keys(client_ip, identifier)
     with closing(connect()) as db, db:
         db.execute("DELETE FROM login_failures WHERE attempted_at < ?", (cutoff,))
-        row = db.execute(
-            "SELECT COUNT(*) AS total, MAX(attempted_at) AS latest FROM login_failures WHERE ip = ? AND attempted_at >= ?",
-            (client_ip, cutoff),
-        ).fetchone()
-        total = row['total'] if row else 0
-        latest = row['latest'] if row else None
-        if total >= LOGIN_MAX_FAILURES and latest and now - latest < LOGIN_LOCK_SECONDS:
-            return True
-        if total >= LOGIN_MAX_FAILURES:
-            db.execute("DELETE FROM login_failures WHERE ip = ?", (client_ip,))
+        for key in keys:
+            row = db.execute(
+                "SELECT COUNT(*) AS total, MAX(attempted_at) AS latest FROM login_failures WHERE ip = ? AND attempted_at >= ?",
+                (key, cutoff),
+            ).fetchone()
+            total = row['total'] if row else 0
+            latest = row['latest'] if row else None
+            if total >= LOGIN_MAX_FAILURES and latest and now - latest < LOGIN_LOCK_SECONDS:
+                return True
+            if total >= LOGIN_MAX_FAILURES:
+                db.execute("DELETE FROM login_failures WHERE ip = ?", (key,))
         return False
 
-def record_login_failure(client_ip):
+def record_login_failure(client_ip, identifier=None):
     now = int(time.time())
-    client_ip = ipaddress.ip_address(client_ip).compressed
     with closing(connect()) as db, db:
-        db.execute("INSERT INTO login_failures (ip, attempted_at) VALUES (?, ?)", (client_ip, now))
+        for key in _login_failure_keys(client_ip, identifier):
+            db.execute("INSERT INTO login_failures (ip, attempted_at) VALUES (?, ?)", (key, now))
 
-def clear_login_failures(client_ip):
-    client_ip = ipaddress.ip_address(client_ip).compressed
+def clear_login_failures(client_ip, identifier=None):
     with closing(connect()) as db, db:
-        db.execute("DELETE FROM login_failures WHERE ip = ?", (client_ip,))
+        for key in _login_failure_keys(client_ip, identifier):
+            db.execute("DELETE FROM login_failures WHERE ip = ?", (key,))
 
 def migrate_local_accounts():
     """Copy local account records to a new Neon database without copying sessions or OTPs."""
@@ -171,9 +195,22 @@ def hash_password(password: str) -> str:
 def verify_password(hash_: str, password: str) -> bool:
     """Verify a password against an Argon2id hash. Returns False on any error."""
     try:
+        if isinstance(hash_, (bytes, bytearray, memoryview)):
+            hash_ = bytes(hash_).decode('utf-8')
         return ph.verify(hash_, password)
     except Exception:
         return False
+
+def password_matches(password, salt, stored_hash):
+    """Accept current Argon2 hashes and legacy PBKDF2 account records."""
+    stored = bytes(stored_hash) if isinstance(stored_hash, (bytes, bytearray, memoryview)) else stored_hash
+    if isinstance(stored, bytes) and stored.startswith(b'$argon2'):
+        return verify_password(stored, password)
+    if isinstance(stored, str) and stored.startswith('$argon2'):
+        return verify_password(stored, password)
+    return isinstance(stored, bytes) and compare_digest(
+        pbkdf2_hmac('sha256', password.encode(), bytes(salt), 600000), stored
+    )
 
 # Backwards‑compatible wrapper (old name still used elsewhere)
 def digest(password, salt):
@@ -250,6 +287,8 @@ def _send_otp_message(email, code, password_reset=False, client_ip=None):
                 headers={
                     'Authorization': f'Bearer {resend_api_key}',
                     'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'User-Agent': 'BrandWise/1.0 (+https://getbrandwise.xyz)',
                 },
                 method='POST',
             )
@@ -260,14 +299,25 @@ def _send_otp_message(email, code, password_reset=False, client_ip=None):
             except urllib.error.HTTPError as exc:
                 if not is_local_dev(client_ip):
                     detail = ''
+                    raw_response = exc.read(4096).decode('utf-8', errors='replace')
+                    if exc.code == 403:
+                        logging.getLogger(__name__).warning(
+                            'Resend rejected email send: content_type=%s response=%s',
+                            exc.headers.get('Content-Type', ''),
+                            raw_response.replace(resend_api_key, '[redacted]')[:300],
+                        )
                     try:
-                        response_data = json.loads(exc.read(4096).decode('utf-8', errors='replace'))
+                        response_data = json.loads(raw_response)
                         detail = response_data.get('message', '') if isinstance(response_data, dict) else ''
                     except (ValueError, UnicodeDecodeError):
                         pass
                     message = f'Resend could not send the {purpose} code (HTTP {exc.code}).'
                     if exc.code == 403:
-                        if 'resend.dev' in resend_sender.casefold():
+                        if raw_response.strip().casefold() == 'error code: 1010':
+                            detail = 'The email provider blocked the app connection before processing the request. Please try again after the service is updated.'
+                        elif detail:
+                            detail = f'Resend says: {detail}'
+                        elif 'resend.dev' in resend_sender.casefold():
                             detail = 'The Resend test sender can only deliver to the email address that owns the Resend account. For verification emails to other users, verify your sending domain (like getbrandwise.xyz) in Resend and set RESEND_FROM to that domain.'
                         else:
                             detail = f'Resend denied sender "{resend_sender}". Make sure the domain is verified in your Resend account and RESEND_API_KEY has sending permission.'
@@ -425,8 +475,8 @@ def reset_password_with_email_otp(raw_email, code, new_password):
     email = normalize_email(raw_email)
     if not isinstance(code, str) or not re.fullmatch(r'\d{6}', code.strip()):
         raise ValueError('Enter the six-digit code from your email.')
-    if not isinstance(new_password, str) or not 4 <= len(new_password) <= 128:
-        raise ValueError('Use a new password between 4 and 128 characters.')
+    if not isinstance(new_password, str) or not 12 <= len(new_password) <= 128:
+        raise ValueError('Use a new password between 12 and 128 characters.')
     now = int(time.time())
     with closing(connect()) as db, db:
         reset = db.execute('SELECT * FROM password_resets WHERE lower(email) = lower(?)', (email,)).fetchone()
@@ -461,8 +511,8 @@ def register(data):
     email = normalize_email(email)
     if role not in ROLES or any(not value or len(value) > 500 for value in (name, organization, work, responsibilities)):
         raise ValueError('Complete the profile questions and select a role.')
-    if not 4 <= len(password) <= 128:
-        raise ValueError('Use a password between 4 and 128 characters.')
+    if not 12 <= len(password) <= 128:
+        raise ValueError('Use a password between 12 and 128 characters.')
     if username.casefold() == 'admin':
         raise ValueError('That username is reserved.')
     salt = secrets.token_bytes(16)
@@ -507,9 +557,11 @@ def login(data):
             'SELECT * FROM accounts WHERE lower(username) = lower(?) OR lower(email) = lower(?)',
             (identifier, identifier),
         ).fetchone()
-        hashed = digest(password, row['salt'] if row else bytes(16))
-        if not row or not compare_digest(hashed, row['password_hash']):
+        if not row or not password_matches(password, row['salt'], row['password_hash']):
             return None
+        if not bytes(row['password_hash']).startswith(b'$argon2'):
+            db.execute('UPDATE accounts SET password_hash=? WHERE username=?',
+                       (digest(password, row['salt']), row['username']))
         token = secrets.token_urlsafe(32)
         now = int(time.time())
         db.execute('DELETE FROM sessions WHERE expires <= ?', (now,))
@@ -561,9 +613,11 @@ def list_workspaces(headers):
 
 def list_workspace_users(headers):
     user = current_user(headers)
+    if user and user['role'] == 'Admin':
+        return list_users()
     membership = active_membership(headers)
     if not user or not membership or membership['role'] != 'Admin':
-        raise PermissionError('Only a company admin can open Team Overview.')
+        raise PermissionError('Only an administrator can open Team Overview.')
     with closing(connect()) as db:
         rows = db.execute("""SELECT accounts.username, accounts.email, accounts.name, accounts.role,
                                    accounts.organization, accounts.work, accounts.responsibilities,
@@ -723,13 +777,13 @@ def change_password(headers, current_password, new_password):
         raise ValueError('Sign in first.')
     if not isinstance(current_password, str) or not current_password or len(current_password) > 128:
         raise ValueError('Enter your current password.')
-    if not isinstance(new_password, str) or not 4 <= len(new_password) <= 128:
-        raise ValueError('Use a new password between 4 and 128 characters.')
+    if not isinstance(new_password, str) or not 12 <= len(new_password) <= 128:
+        raise ValueError('Use a new password between 12 and 128 characters.')
     token = cookie_token(headers)
     with closing(connect()) as db:
         db.execute('BEGIN IMMEDIATE')
         row = db.execute('SELECT salt, password_hash FROM accounts WHERE username=?', (user['username'],)).fetchone()
-        if not row or not compare_digest(digest(current_password, row['salt']), row['password_hash']):
+        if not row or not password_matches(current_password, row['salt'], row['password_hash']):
             db.rollback()
             raise ValueError('The current password is incorrect.')
         salt = secrets.token_bytes(16)
@@ -748,7 +802,7 @@ def delete_account(headers, password):
     with closing(connect()) as db:
         db.execute('BEGIN IMMEDIATE')
         row = db.execute('SELECT salt, password_hash, email FROM accounts WHERE username=?', (user['username'],)).fetchone()
-        if not row or not compare_digest(digest(password, row['salt']), row['password_hash']):
+        if not row or not password_matches(password, row['salt'], row['password_hash']):
             db.rollback()
             raise ValueError('The current password is incorrect.')
         # Profile details live on the account row. Delete that row and all
