@@ -3,3 +3,6 @@
 [submodule ""Brand-Wise""]
     path = Brand-Wise
     url = https://github.com/vigneshkondaparthy1-cell/Brand-Wise-Submodule.git
+[submodule "Brand-Wise"]
+    path = Brand-Wise
+    url = https://github.com/vigneshkondaparthy1-cell/Brand-Wise-Submodule.git
