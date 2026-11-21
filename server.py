@@ -20,6 +20,7 @@ import time
 import hashlib
 import base64
 import re
+from datetime import date
 from pathlib import Path
 from typing import Optional, Dict, Any
 
@@ -71,9 +72,11 @@ Talisman(
     app,
     content_security_policy={
         "default-src": "'self'",
-        "script-src": "'self' " + _csp_script_hashes(),
+        "script-src": "'self' https://cdn.jsdelivr.net 'wasm-unsafe-eval' " + _csp_script_hashes(),
         "style-src": "'self' 'unsafe-inline'",
         "img-src": "'self' data:",
+        "connect-src": "'self' https://cdn.jsdelivr.net https://huggingface.co https://*.huggingface.co https://*.hf.co https://raw.githubusercontent.com",
+        "worker-src": "'self' blob:",
     },
     force_https=False,  # change to True in production behind HTTPS
     session_cookie_http_only=True,
@@ -343,11 +346,10 @@ def get_current_ai_reference_claims() -> list:
             claims = json.load(f)
     except Exception:
         return []
-    # Keep only active or verified claims
+    # AI context must contain only current, approved claims.
     filtered = []
     for claim in claims:
-        state = claim.get("state", "").lower()
-        if "cannot verify" in state or "expired" in state:
+        if claim.get('status') != 'Active' or (claim.get('expiry') and claim['expiry'] < date.today().isoformat()):
             continue
         filtered.append(claim)
     return filtered
@@ -374,7 +376,13 @@ def run_brandwise_checks(text: str, channel: str = "Website Copy", _claims=None)
             "actionStatus": "pending",
         })
     # 3. Claim checks (built‑in claims + optional custom claims)
-    claims = _claims if _claims is not None else get_current_ai_reference_claims()
+    if _claims is not None:
+        claims = _claims
+    else:
+        try:
+            claims = json.loads((Path(__file__).parent / 'claims-data.json').read_text(encoding='utf-8'))
+        except (OSError, ValueError):
+            claims = []
     # Helper to add a finding
     def add_finding(cat, src_id, location, title, **extra):
         # Add a default 'why' explanation for findings that cannot be verified automatically
@@ -395,6 +403,8 @@ def run_brandwise_checks(text: str, channel: str = "Website Copy", _claims=None)
     for claim in claims:
         # Standard prohibited phrase detection (Prohibited Claim Wording)
         for phrase in claim.get('prohibitedPhrases', []):
+            if claim.get('id') == 'CLM-005' and phrase.startswith('$'):
+                continue  # The pricing check below reports this once with the right status.
             for m in re.finditer(re.escape(phrase), text, re.I):
                 add_finding(
                     "Prohibited Claim Wording",
@@ -428,17 +438,13 @@ def run_brandwise_checks(text: str, channel: str = "Website Copy", _claims=None)
                         official=claim.get('evidence'),
                         owner=claim.get('owner'),
                     )
-        # Pricing specific detection for expired claims (e.g., CLM-005)
-        if claim.get('id') == 'CLM-005':
-            # Look for the old price pattern
-            if re.search(r"\$49[ /]month", text):
-                add_finding(
-                    "Expired Claim / Missing Current Proof",
-                    claim.get('id'),
-                    f"Offset {text.find('$49')}",
-                    "Legacy pricing claim no longer valid (demo)",
-                    title="Demo pricing claim",
-                )
+    # Any unapproved demo price needs a human check; the active $79 reference is exempt.
+    price = re.search(r'\$\d+(?:\.\d{2})?', text)
+    if price and not re.search(r'\$79\s+per\s+seat\s+per\s+month\b', text, re.I):
+        add_finding('Expired Claim / Missing Current Proof', 'CLM-005',
+                    f'Offset {price.start()}..{price.end()}', 'Demo pricing claim needs current proof',
+                    wrong=price.group(0), why='Current pricing evidence is required before publication.',
+                    official='2026 Price Book (Finance approval required)', owner='Finance Operations')
     # Return combined result
     return {
         "findings": findings,

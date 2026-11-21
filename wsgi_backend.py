@@ -2,22 +2,36 @@
 
 from email.message import Message
 from io import BytesIO
+import base64
+import hashlib
+import re
 
 from flask import Flask, Response, request
 from flask_talisman import Talisman
 
 import full_backend
+import accounts
 
 
 full_backend.init_storage()
 app = Flask(__name__)
+def _homepage_script_hashes():
+    page = (full_backend.ROOT / full_backend.PAGE).read_text(encoding='utf-8')
+    scripts = re.findall(r'<script[^>]*>(.*?)</script>', page, re.I | re.S)
+    return ' '.join(
+        "'sha256-" + base64.b64encode(hashlib.sha256(script.replace('\r\n', '\n').encode('utf-8')).digest()).decode('ascii') + "'"
+        for script in scripts if script.strip()
+    )
+
 Talisman(
     app,
     content_security_policy={
         "default-src": "'self'",
-        "script-src": "'self'",
+        "script-src": "'self' https://cdn.jsdelivr.net 'wasm-unsafe-eval' " + _homepage_script_hashes(),
         "style-src": "'self' 'unsafe-inline'",
         "img-src": "'self' data:",
+        "connect-src": "'self' https://cdn.jsdelivr.net https://huggingface.co https://*.huggingface.co https://*.hf.co https://raw.githubusercontent.com",
+        "worker-src": "'self' blob:",
     },
     force_https=False,
     referrer_policy="strict-origin-when-cross-origin",
@@ -35,7 +49,7 @@ class RequestHandler(full_backend.Handler):
         self.path = request.full_path.rstrip('?')
         self.request_version = "HTTP/1.1"
         self.requestline = f"{self.command} {self.path} {self.request_version}"
-        self.client_address = (request.remote_addr or "127.0.0.1", 0)
+        self.client_address = (accounts.request_client_ip(request.headers, request.remote_addr), 0)
         self.close_connection = False
         self.headers = Message()
         for key, value in request.headers.items():

@@ -38,17 +38,12 @@ def register_auth_routes(app, limiter):
             return jsonify({'error': 'Sign in first.'}), 401
         return jsonify(user)
 
-    @app.post('/api/auth/resolve-login')
-    def resolve_login():
-        data = request.get_json(silent=True) or {}
-        return jsonify({'email': accounts.email_for_login(data.get('username'))})
-
     @app.post('/api/auth/send-otp')
     @limiter.limit('5 per 10 minutes')
     def send_otp():
         data = request.get_json(silent=True) or {}
         try:
-            result = accounts.send_email_otp(data.get('email'), client_ip=request.remote_addr)
+            result = accounts.send_email_otp(data.get('email'), client_ip=accounts.request_client_ip(request.headers, request.remote_addr))
         except accounts.EmailDeliveryError as error:
             return jsonify({'error': str(error)}), 503
         except ValueError as error:
@@ -70,7 +65,7 @@ def register_auth_routes(app, limiter):
     def password_reset_send():
         data = request.get_json(silent=True) or {}
         try:
-            result = accounts.send_password_reset_otp(data.get('email'), client_ip=request.remote_addr)
+            result = accounts.send_password_reset_otp(data.get('email'), client_ip=accounts.request_client_ip(request.headers, request.remote_addr))
         except accounts.EmailDeliveryError as error:
             return jsonify({'error': str(error)}), 503
         except ValueError as error:
@@ -112,15 +107,17 @@ def register_auth_routes(app, limiter):
     @limiter.limit('10 per minute')
     def login():
         data = request.get_json(silent=True) or {}
-        ip = request.remote_addr or '127.0.0.1'
-        if not accounts.is_local_dev(ip) and accounts.login_is_limited(ip):
+        ip = accounts.request_client_ip(request.headers, request.remote_addr)
+        identifier = data.get('username')
+        rate_identifier = accounts.email_for_login(identifier) or identifier
+        if not accounts.is_local_dev(ip) and accounts.login_is_limited(ip, rate_identifier):
             return jsonify({'error': 'Too many sign-in attempts. Try again later.'}), 429
         token = accounts.login(data)
         if not token:
             if not accounts.is_local_dev(ip):
-                accounts.record_login_failure(ip)
+                accounts.record_login_failure(ip, rate_identifier)
             return jsonify({'error': 'Username, email, or password is incorrect.'}), 401
-        accounts.clear_login_failures(ip)
+        accounts.clear_login_failures(ip, rate_identifier)
         response = jsonify({'ok': True})
         response.set_cookie('brandwise_session', token, max_age=accounts.SESSION_AGE,
                             httponly=True, secure=bool(os.environ.get('RENDER')),
@@ -133,4 +130,3 @@ def register_auth_routes(app, limiter):
         response = jsonify({'ok': True})
         response.delete_cookie('brandwise_session', path='/')
         return response
-

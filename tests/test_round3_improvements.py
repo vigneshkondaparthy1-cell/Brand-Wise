@@ -37,8 +37,8 @@ class Round3ImprovementsTests(unittest.TestCase):
             with patch.object(accounts, '_send_otp_message', side_effect=lambda email, code, **kw: code):
                 res = accounts.send_password_reset_otp(email)
                 self.assertTrue(res['ok'])
-                accounts.reset_password_with_email_otp(email, res['dev_code'], 'new4')
-            self.assertIsNotNone(accounts.login({'username':'reset_user', 'password':'new4'}))
+                accounts.reset_password_with_email_otp(email, res['dev_code'], 'new-strong-passphrase')
+            self.assertIsNotNone(accounts.login({'username':'reset_user', 'password':'new-strong-passphrase'}))
             self.assertIsNone(accounts.login({'username':'reset_user', 'password':'oldpass'}))
 
     def test_invalid_otp_cannot_reset_custom_password(self):
