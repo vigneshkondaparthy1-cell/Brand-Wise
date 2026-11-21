@@ -1,0 +1,12 @@
+﻿.dropdown-arrow {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  margin-left: 4px;
+  vertical-align: middle;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid #555;   /* colour – change if you like */
+  transition: transform 0.2s ease;
+}
+.dropdown-open .dropdown-arrow { transform: rotate(180deg); }
