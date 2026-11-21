@@ -1410,20 +1410,19 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError as exc:
                 return self.send_json(400, {'error': str(exc)})
             return self.send_json(201, {'ok': True}, self._session_cookie(token))
-        if path == '/api/auth/resolve-login':
-            email = accounts.email_for_login(data.get('username'))
-            return self.send_json(200, {'email': email})
         if path == '/api/auth/login':
             client_ip = self.client_address[0]
             local_dev = accounts.is_local_dev(client_ip)
-            if not local_dev and accounts.login_is_limited(client_ip):
+            identifier = data.get('username')
+            rate_identifier = accounts.email_for_login(identifier) or identifier
+            if not local_dev and accounts.login_is_limited(client_ip, rate_identifier):
                 return self.send_json(429, {'error': 'Too many sign-in attempts. Try again later.'})
             token = accounts.login(data)
             if not token:
                 if not local_dev:
-                    accounts.record_login_failure(client_ip)
-                return self.send_json(401, {'error': 'Username, email, or password is incorrect. You can try again immediately.'})
-            accounts.clear_login_failures(client_ip)
+                    accounts.record_login_failure(client_ip, rate_identifier)
+                return self.send_json(401, {'error': 'Username, email, or password is incorrect.'})
+            accounts.clear_login_failures(client_ip, rate_identifier)
             return self.send_json(200, {'ok': True}, self._session_cookie(token))
         user = accounts.current_user(self.headers)
         if not user:
@@ -1607,14 +1606,13 @@ class Handler(BaseHTTPRequestHandler):
                     ai_status = 'Browser AI response was unavailable or invalid; deterministic checks only.'
             elif data.get('useAI') is True and data.get('aiProvider') == 'gemini':
                 if os.environ.get('GEMINI_API_KEY', '').strip():
-                    ai_findings, ai_status = gemini_review(content, [c for c in active_claims if c.get('status') == 'Active'], active_guidelines)
+                    ai_findings, ai_status, ai_used = gemini_review(content, [c for c in active_claims if c.get('status') == 'Active'], active_guidelines)
                     for item in ai_findings:
                         phrase = item.get('wrong', '')
                         if not phrase or len(re.findall(re.escape(phrase), content, re.I)) != 1:
                             item['fix'] = ''
                             item['automaticFixAllowed'] = False
                             item['needsHumanReview'] = True
-                    ai_used = True
                 else:
                     ai_status = 'Gemini is not configured; deterministic checks only.'
             check_result['findings'].extend(ai_findings)

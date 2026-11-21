@@ -75,7 +75,9 @@ class TestBrandWiseBackend(unittest.TestCase):
 
     def test_orchestrator_scoring(self):
         """Orchestrator computes deductions and grounded score."""
-        clean_text = "Acme Technologies was established in 2012. BrandWise cuts onboarding time by up to 20%. Terms and conditions apply."
+        clean_text = ("Acme Technologies was established in 2012. BrandWise cuts onboarding time by up to 20%. "
+                      "Terms and conditions apply. Performance metrics reflect verified customer benchmarks "
+                      "and may vary based on deployment configuration.")
         res = orchestrator.run_full_audit(clean_text, channel="Website Copy")
         self.assertEqual(len(res["findings"]), 0)
         self.assertEqual(res["score"], 100)
